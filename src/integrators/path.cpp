@@ -122,6 +122,103 @@ Spectrum PathIntegrator::Li(const Scene *scene, const Renderer *renderer,
     return L;
 }
 
+vector<Spectrum> PathIntegrator::Li_separate(const Scene *scene, const Renderer *renderer,
+        const RayDifferential &r, const Intersection &isect,
+        const Sample *sample, RNG &rng, MemoryArena &arena) const {
+    // Declare common path integration variables
+    Spectrum pathThroughput = 1.;
+	vector<Spectrum> L_separate(3,0.);
+    RayDifferential ray(r);
+    bool specularBounce = false;
+    Intersection localIsect;
+    const Intersection *isectp = &isect;
+    for (int bounces = 0; ; ++bounces) {
+        // Possibly add emitted light at path vertex
+        if (bounces == 0 || specularBounce){
+			Spectrum tmp = pathThroughput * isectp->Le(-ray.d);
+			if(bounces==0){ // if direct illumination only
+				L_separate.at(0) = tmp;
+			}
+			else{ // if indirect illumination only
+				L_separate.at(1) += tmp;
+			}
+			// combined illumination
+			L_separate.at(2) += tmp;
+		}
+        // Sample illumination from lights to find path contribution
+        BSDF *bsdf = isectp->GetBSDF(ray, arena);
+        const Point &p = bsdf->dgShading.p;
+        const Normal &n = bsdf->dgShading.nn;
+        Vector wo = -ray.d;
+        if (bounces < SAMPLE_DEPTH){
+			Spectrum tmp = pathThroughput *
+                 UniformSampleOneLight(scene, renderer, arena, p, n, wo,
+                     isectp->rayEpsilon, ray.time, bsdf, sample, rng,
+                     lightNumOffset[bounces], &lightSampleOffsets[bounces],
+                     &bsdfSampleOffsets[bounces]);
+
+			if(bounces==0){ // if direct illumination only
+				L_separate.at(0) = tmp;
+			}
+			else{ // if indirect illumination only
+				L_separate.at(1) += tmp;
+			}
+			// combined illumination
+            L_separate.at(2) += tmp;
+		}else{
+            Spectrum tmp = pathThroughput *
+                 UniformSampleOneLight(scene, renderer, arena, p, n, wo,
+                     isectp->rayEpsilon, ray.time, bsdf, sample, rng);
+
+			L_separate.at(1) += tmp;
+			L_separate.at(2) += tmp;
+		}
+        // Sample BSDF to get new path direction
+
+        // Get _outgoingBSDFSample_ for sampling new path direction
+        BSDFSample outgoingBSDFSample;
+        if (bounces < SAMPLE_DEPTH)
+            outgoingBSDFSample = BSDFSample(sample, pathSampleOffsets[bounces],
+                                            0);
+        else
+            outgoingBSDFSample = BSDFSample(rng);
+        Vector wi;
+        float pdf;
+        BxDFType flags;
+        Spectrum f = bsdf->Sample_f(wo, &wi, outgoingBSDFSample, &pdf,
+                                    BSDF_ALL, &flags);
+        if (f.IsBlack() || pdf == 0.)
+            break;
+        specularBounce = (flags & BSDF_SPECULAR) != 0;
+        pathThroughput *= f * AbsDot(wi, n) / pdf;
+        ray = RayDifferential(p, wi, ray, isectp->rayEpsilon);
+
+        // Possibly terminate the path
+        if (bounces > 3) {
+            float continueProbability = min(.5f, pathThroughput.y());
+            if (rng.RandomFloat() > continueProbability)
+                break;
+            pathThroughput /= continueProbability;
+        }
+        if (bounces == maxDepth)
+            break;
+
+        // Find next vertex of path
+        if (!scene->Intersect(ray, &localIsect)) {
+            if (specularBounce)
+                for (uint32_t i = 0; i < scene->lights.size(); ++i){
+                   Spectrum tmp = pathThroughput * scene->lights[i]->Le(ray);
+				   L_separate.at(1) += tmp;
+				   L_separate.at(2) += tmp;
+				}
+            break;
+        }
+        pathThroughput *= renderer->Transmittance(scene, ray, NULL, rng, arena);
+        isectp = &localIsect;
+    }
+    return L_separate;
+}
+
 
 PathIntegrator *CreatePathSurfaceIntegrator(const ParamSet &params) {
     int maxDepth = params.FindOneInt("maxdepth", 5);

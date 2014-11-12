@@ -85,11 +85,12 @@ void SamplerRecorderRendererTask::Run() {
     Intersection isect;
 
     // Get samples from _Sampler_ and update image
+	int itr_count = 0;
     int sampleCount;
     while ((sampleCount = sampler->GetMoreSamples(samples, rng)) > 0) {
 
 		if(sampleIndex>=sampleCount) return;
-
+		itr_count++;
         // Generate camera rays and compute radiance along rays
        
         // Find camera ray for _sample[sampleIndex]_
@@ -160,10 +161,118 @@ void SamplerRecorderRendererTask::Run() {
     delete sampler;
     delete[] samples;
     reporter.Update();
+
+	itr_count = -5;
+
     PBRT_FINISHED_RENDERTASK(taskNum);
 }
 
+// SamplerAccumulationRendererTask Definitions
+void SamplerAccumulationRendererTask::Run() {
+    PBRT_STARTED_RENDERTASK(taskNum);
+    // Get sub-_Sampler_ for _SamplerRendererTask_
+    Sampler *sampler = mainSampler->GetSubSampler(taskNum, taskCount);
+    if (!sampler)
+    {
+        reporter.Update();
+        PBRT_FINISHED_RENDERTASK(taskNum);
+        return;
+    }
 
+    // Declare local variables used for rendering loop
+    MemoryArena arena;
+    RNG rng(taskNum);
+
+    // Allocate space for samples and intersections
+    int maxSamples = sampler->MaximumSampleCount();
+    Sample *samples = origSample->Duplicate(maxSamples);
+    RayDifferential *rays = new RayDifferential[maxSamples];
+    Spectrum *Ls = new Spectrum[maxSamples];
+    Spectrum *Ts = new Spectrum[maxSamples];
+    Intersection *isects = new Intersection[maxSamples];
+
+    // Get samples from _Sampler_ and update image
+    int sampleCount;
+    while ((sampleCount = sampler->GetMoreSamples(samples, rng)) > 0) {
+        // Generate camera rays and compute radiance along rays
+        for (int i = 0; i < sampleCount; ++i) {
+            // Find camera ray for _sample[i]_
+            PBRT_STARTED_GENERATING_CAMERA_RAY(&samples[i]);
+            float rayWeight = camera->GenerateRayDifferential(samples[i], &rays[i]);
+            rays[i].ScaleDifferentials(1.f / sqrtf(sampler->samplesPerPixel));
+            PBRT_FINISHED_GENERATING_CAMERA_RAY(&samples[i], &rays[i], rayWeight);
+
+            // Evaluate radiance along camera ray
+            PBRT_STARTED_CAMERA_RAY_INTEGRATION(&rays[i], &samples[i]);
+            if (visualizeObjectIds) {
+                if (rayWeight > 0.f && scene->Intersect(rays[i], &isects[i])) {
+                    // random shading based on shape id...
+                    uint32_t ids[2] = { isects[i].shapeId, isects[i].primitiveId };
+                    uint32_t h = hash((char *)ids, sizeof(ids));
+                    float rgb[3] = { float(h & 0xff), float((h >> 8) & 0xff),
+                                     float((h >> 16) & 0xff) };
+                    Ls[i] = Spectrum::FromRGB(rgb);
+                    Ls[i] /= 255.f;
+                }
+                else
+                    Ls[i] = 0.f;
+            }
+            else {
+            if (rayWeight > 0.f)
+                Ls[i] = rayWeight * renderer->Li(scene, rays[i], &samples[i], rng,
+                                                 arena, &isects[i], &Ts[i]);
+            else {
+                Ls[i] = 0.f;
+                Ts[i] = 1.f;
+            }
+
+            // Issue warning if unexpected radiance value returned
+            if (Ls[i].HasNaNs()) {
+                Error("Not-a-number radiance value returned "
+                      "for image sample.  Setting to black.");
+                Ls[i] = Spectrum(0.f);
+            }
+            else if (Ls[i].y() < -1e-5) {
+                Error("Negative luminance value, %f, returned "
+                      "for image sample.  Setting to black.", Ls[i].y());
+                Ls[i] = Spectrum(0.f);
+            }
+            else if (isinf(Ls[i].y())) {
+                Error("Infinite luminance value returned "
+                      "for image sample.  Setting to black.");
+                Ls[i] = Spectrum(0.f);
+            }
+            }
+            PBRT_FINISHED_CAMERA_RAY_INTEGRATION(&rays[i], &samples[i], &Ls[i]);
+        }
+
+        // Report sample results to _Sampler_, add contributions to image
+        if (sampler->ReportResults(samples, rays, Ls, isects, sampleCount))
+        {
+            for (int i = 0; i < sampleCount; ++i)
+            {
+                PBRT_STARTED_ADDING_IMAGE_SAMPLE(&samples[i], &rays[i], &Ls[i], &Ts[i]);
+                camera->film->AddSample(samples[i], Ls[i]);
+                PBRT_FINISHED_ADDING_IMAGE_SAMPLE();
+            }
+        }
+
+        // Free _MemoryArena_ memory from computing image sample values
+        arena.FreeAll();
+    }
+
+    // Clean up after _SamplerRendererTask_ is done with its image region
+    camera->film->UpdateDisplay(sampler->xPixelStart,
+        sampler->yPixelStart, sampler->xPixelEnd+1, sampler->yPixelEnd+1);
+    delete sampler;
+    delete[] samples;
+    delete[] rays;
+    delete[] Ls;
+    delete[] Ts;
+    delete[] isects;
+    reporter.Update();
+    PBRT_FINISHED_RENDERTASK(taskNum);
+}
 
 // SamplerRecorderRenderer Method Definitions
 SamplerRecorderRenderer::SamplerRecorderRenderer(Sampler *s, Camera *c,
@@ -229,6 +338,22 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 
 		reporter.Done();
 	}
+
+	// write accumulated image
+	ProgressReporter reporter(nTasks, "Rendering accumulated Samples");
+    vector<Task *> renderTasks;
+    for (int i = 0; i < nTasks; ++i)
+        renderTasks.push_back(new SamplerAccumulationRendererTask(scene, this, camera,
+                                                      reporter, sampler, sample, 
+                                                      visualizeObjectIds, 
+                                                      nTasks-1-i, nTasks));
+    EnqueueTasks(renderTasks);
+    WaitForAllTasks();
+    for (uint32_t i = 0; i < renderTasks.size(); ++i)
+        delete renderTasks[i];
+    reporter.Done();
+
+	camera->film->WriteImage();
 
 	// Clean up after rendering and store final image
 	PBRT_FINISHED_RENDERING();

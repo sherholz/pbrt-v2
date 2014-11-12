@@ -62,6 +62,8 @@ public:
     void WriteImage(float splatScale);
 	void WriteImageIndexed(const int& index, float splatScale);
     void UpdateDisplay(int x0, int y0, int x1, int y1, float splatScale);
+	void SetFilename(const string fn){filename = fn;}
+	string GetFilename(){return filename;}
 private:
     // ImageFilm Private Data
     Filter *filter;

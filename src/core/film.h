@@ -58,6 +58,8 @@ public:
     virtual void UpdateDisplay(int x0, int y0, int x1, int y1, float splatScale = 1.f);
     virtual void WriteImage(float splatScale = 1.f) = 0;
 	virtual void WriteImageIndexed(const int& index, float splatScale = 1.f) = 0;
+	virtual void SetFilename(const string filename) = 0;
+	virtual string GetFilename() = 0;
 
     // Film Public Data
     const int xResolution, yResolution;

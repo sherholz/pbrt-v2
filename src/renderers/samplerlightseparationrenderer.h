@@ -33,88 +33,80 @@
 #pragma once
 #endif
 
-#ifndef PBRT_RENDERERS_SAMPLER_RECORDER_RENDERER_H
-#define PBRT_RENDERERS_SAMPLER_RECORDER_RENDERER_H
+#ifndef PBRT_RENDERERS_LIGHT_SEPARATION_RENDERER_H
+#define PBRT_RENDERERS_LIGHT_SEPARATION_RENDERER_H
 
-// renderers/samplerrecorderrenderer.h*
+// renderers/samplerlightseparationrenderer.h*
 #include "pbrt.h"
 #include "renderer.h"
 #include "parallel.h"
 
-// SamplerRecorderRenderer Declarations
-class SamplerRecorderRenderer : public Renderer {
+class PathIntegrator;
+
+enum IlluminationType
+{
+	DIRECT_ILLUMINATION,
+	INDIRECT_ILLUMINATION
+};
+
+// SamplerLightSeparationRenderer Declarations
+class SamplerLightSeparationRenderer : public Renderer {
 public:
-    // SamplerRecorderRenderer Public Methods
-    SamplerRecorderRenderer(Sampler *s, Camera *c, SurfaceIntegrator *si,
+    // SamplerLightSeparationRenderer Public Methods
+    SamplerLightSeparationRenderer(Sampler *s, vector<Camera *>c, PathIntegrator *pi,
                     VolumeIntegrator *vi, bool visIds);
-    ~SamplerRecorderRenderer();
+    ~SamplerLightSeparationRenderer();
     void Render(const Scene *scene);
-    Spectrum Li(const Scene *scene, const RayDifferential &ray,
+
+	// returns direct (index 0), indirect (index 1) and combined (index 2) illumination 
+    vector<Spectrum> Li_separated(const Scene *scene, const RayDifferential &ray,
         const Sample *sample, RNG &rng, MemoryArena &arena,
         Intersection *isect = NULL, Spectrum *T = NULL) const;
-    Spectrum Transmittance(const Scene *scene, const RayDifferential &ray,
+
+	Spectrum Li(const Scene *scene, const RayDifferential &ray,
+        const Sample *sample, RNG &rng, MemoryArena &arena,
+        Intersection *isect = NULL, Spectrum *T = NULL) const;
+	Spectrum Transmittance(const Scene *scene, const RayDifferential &ray,
         const Sample *sample, RNG &rng, MemoryArena &arena) const;
+    
 private:
-    // SamplerRecorderRenderer Private Data
+    // SamplerLightSeparationRenderer Private Data
     bool visualizeObjectIds;
     Sampler *sampler;
-    Camera *camera;
-    SurfaceIntegrator *surfaceIntegrator;
+    vector<Camera *>cameras;
+    PathIntegrator *pathIntegrator;
     VolumeIntegrator *volumeIntegrator;
 };
 
 
 
-// SamplerRecorderRendererTask Declarations
-class SamplerRecorderRendererTask : public Task {
+// SamplerLightSeparationRendererTask Declarations
+class SamplerLightSeparationRendererTask : public Task {
 public:
-    // SamplerRecorderRendererTask Public Methods
-    SamplerRecorderRendererTask(const Scene *sc, Renderer *ren, Camera *c,
+    // SamplerLightSeparationRendererTask Public Methods
+    SamplerLightSeparationRendererTask(const Scene *sc, SamplerLightSeparationRenderer *ren, vector<Camera *>c,
                         ProgressReporter &pr, Sampler *ms, Sample *sam, 
-                        bool visIds, int tn, int tc, int si)
+                        bool visIds, int tn, int tc, IlluminationType it)
       : reporter(pr)
     {
-        scene = sc; renderer = ren; camera = c; mainSampler = ms;
-		origSample = sam; visualizeObjectIds = visIds; taskNum = tn; taskCount = tc; sampleIndex = si;
-    }
-    void Run();
-private:
-    // SamplerRecorderRendererTask Private Data
-    const Scene *scene;
-    const Renderer *renderer;
-    Camera *camera;
-    Sampler *mainSampler;
-    ProgressReporter &reporter;
-    Sample *origSample;
-    bool visualizeObjectIds;
-    int taskNum, taskCount, sampleIndex;
-};
-
-
-// SamplerAccumulationRendererTask Declarations
-class SamplerAccumulationRendererTask : public Task {
-public:
-    // SamplerRendererTask Public Methods
-    SamplerAccumulationRendererTask(const Scene *sc, Renderer *ren, Camera *c,
-                        ProgressReporter &pr, Sampler *ms, Sample *sam, 
-                        bool visIds, int tn, int tc)
-      : reporter(pr)
-    {
-        scene = sc; renderer = ren; camera = c; mainSampler = ms;
+        scene = sc; renderer = ren; cameras = c; mainSampler = ms;
         origSample = sam; visualizeObjectIds = visIds; taskNum = tn; taskCount = tc;
+		illuminationType = it;
     }
     void Run();
 private:
-    // SamplerAccumulationRendererTask Private Data
+    // SamplerLightSeparationRendererTask Private Data
     const Scene *scene;
-    const Renderer *renderer;
-    Camera *camera;
+    const SamplerLightSeparationRenderer *renderer;
+    vector<Camera *>cameras;
     Sampler *mainSampler;
     ProgressReporter &reporter;
     Sample *origSample;
     bool visualizeObjectIds;
     int taskNum, taskCount;
+	IlluminationType illuminationType;
 };
 
 
-#endif // PBRT_RENDERERS_SAMPLERRENDERER_H
+
+#endif // PBRT_RENDERERS_SAMPLER_LIGHT_SEPARATION_RENDERER_H

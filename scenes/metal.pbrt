@@ -2,13 +2,12 @@
 LookAt 18 5.5 2    15.5 .9 10   0 1 0
 Camera "perspective" "float fov" [40]
 
-Sampler "lowdiscrepancy" "integer pixelsamples" [4]
+Sampler "lowdiscrepancy" "integer pixelsamples" [32]
 PixelFilter "box"
 
-Film "image" "integer xresolution" [400] "integer yresolution" [400]
+Film "image" "integer xresolution" [1024] "integer yresolution" [1024]
 
-Renderer "metropolis" "integer samplesperpixel" [128] 
-    "bool dodirectseparately" ["true"] "integer directsamples" [8]
+Renderer "samplerlightseparation" "integer samplesperpixel" [32] 
 
 WorldBegin
 

@@ -249,6 +249,7 @@
     <ClInclude Include="..\renderers\aggregatetest.h" />
     <ClInclude Include="..\renderers\createprobes.h" />
     <ClInclude Include="..\renderers\metropolis.h" />
+    <ClInclude Include="..\renderers\samplerlightseparationrenderer.h" />
     <ClInclude Include="..\renderers\samplerrecorderrenderer.h" />
     <ClInclude Include="..\renderers\samplerrenderer.h" />
     <ClInclude Include="..\renderers\surfacepoints.h" />
@@ -1211,6 +1212,7 @@
     <ClCompile Include="..\renderers\aggregatetest.cpp" />
     <ClCompile Include="..\renderers\createprobes.cpp" />
     <ClCompile Include="..\renderers\metropolis.cpp" />
+    <ClCompile Include="..\renderers\samplerlightseparationrenderer.cpp" />
     <ClCompile Include="..\renderers\samplerrecorderrenderer.cpp" />
     <ClCompile Include="..\renderers\samplerrenderer.cpp" />
     <ClCompile Include="..\renderers\surfacepoints.cpp" />
