@@ -5,9 +5,9 @@ Camera "perspective" "float fov" [40]
 Sampler "lowdiscrepancy" "integer pixelsamples" [32]
 PixelFilter "box"
 
-Film "image" "integer xresolution" [1024] "integer yresolution" [1024]
+Film "image" "integer xresolution" [256] "integer yresolution" [256]
 
-Renderer "samplerlightseparation" "integer samplesperpixel" [32] 
+Renderer "samplerrecorder" "integer samplesperpixel" [32] 
 
 WorldBegin
 

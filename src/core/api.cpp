@@ -93,7 +93,6 @@
 #include "renderers/metropolis.h"
 #include "renderers/samplerrenderer.h"
 #include "renderers/samplerrecorderrenderer.h"
-#include "renderers/samplerlightseparationrenderer.h"
 #include "renderers/surfacepoints.h"
 #include "samplers/adaptive.h"
 #include "samplers/bestcandidate.h"
@@ -1252,30 +1251,10 @@ Renderer *RenderOptions::MakeRenderer() const {
         Sampler *sampler = MakeSampler(SamplerName, SamplerParams, camera->film, camera);
         if (!sampler) Severe("Unable to create sampler recorder.");
         // Create surface and volume integrators
-        SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
-            SurfIntegratorParams);
-        if (!surfaceIntegrator) Severe("Unable to create surface integrator.");
-        VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
-            VolIntegratorParams);
-        if (!volumeIntegrator) Severe("Unable to create volume integrator.");
-        renderer = new SamplerRecorderRenderer(sampler, camera, surfaceIntegrator,
-                                       volumeIntegrator, visIds);
-        // Warn if no light sources are defined
-        if (lights.size() == 0)
-            Warning("No light sources defined in scene; "
-                "possibly rendering a black image.");
-    }
-	else if(RendererName == "samplerlightseparation") 
-	{
-        bool visIds = RendererParams.FindOneBool("visualizeobjectids", false);
-        RendererParams.ReportUnused();
-        Sampler *sampler = MakeSampler(SamplerName, SamplerParams, camera->film, camera);
-        if (!sampler) Severe("Unable to create light separation sampler.");
-
-        // Create path and volume integrators
-		// !! HACK: explicitly create pathintegrator instead of surfaceintegrator
+        // !! HACK: explicitly create pathintegrator instead of surfaceintegrator
         PathIntegrator *pathIntegrator =  CreatePathSurfaceIntegrator(SurfIntegratorParams);
         if (!pathIntegrator) Severe("Unable to create path integrator.");
+
         VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
             VolIntegratorParams);
         if (!volumeIntegrator) Severe("Unable to create volume integrator.");
@@ -1284,8 +1263,9 @@ Renderer *RenderOptions::MakeRenderer() const {
 		cameras.at(0) = camera;
 		cameras.at(1) = MakeCamera();
 		cameras.at(2) = MakeCamera();
-        renderer = new SamplerLightSeparationRenderer(sampler, cameras, pathIntegrator, volumeIntegrator, visIds);
 
+        renderer = new SamplerRecorderRenderer(sampler, cameras, pathIntegrator,
+                                       volumeIntegrator, visIds);
         // Warn if no light sources are defined
         if (lights.size() == 0)
             Warning("No light sources defined in scene; "

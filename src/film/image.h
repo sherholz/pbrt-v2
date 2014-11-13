@@ -60,10 +60,9 @@ public:
     void GetSampleExtent(int *xstart, int *xend, int *ystart, int *yend) const;
     void GetPixelExtent(int *xstart, int *xend, int *ystart, int *yend) const;
     void WriteImage(float splatScale);
-	void WriteImageIndexed(const int& index, float splatScale);
+	void WriteImageWithSuffix(const string& suffix, float splatScale);
     void UpdateDisplay(int x0, int y0, int x1, int y1, float splatScale);
-	void SetFilename(const string fn){filename = fn;}
-	string GetFilename(){return filename;}
+	
 private:
     // ImageFilm Private Data
     Filter *filter;

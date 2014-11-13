@@ -41,14 +41,21 @@
 #include "renderer.h"
 #include "parallel.h"
 
+class PathIntegrator;
+
+
 // SamplerRecorderRenderer Declarations
 class SamplerRecorderRenderer : public Renderer {
 public:
     // SamplerRecorderRenderer Public Methods
-    SamplerRecorderRenderer(Sampler *s, Camera *c, SurfaceIntegrator *si,
+    SamplerRecorderRenderer(Sampler *s, vector<Camera *>c, PathIntegrator *pi,
                     VolumeIntegrator *vi, bool visIds);
     ~SamplerRecorderRenderer();
     void Render(const Scene *scene);
+	// returns direct (index 0), indirect (index 1) and combined (index 2) illumination 
+    vector<Spectrum> Li_separated(const Scene *scene, const RayDifferential &ray,
+        const Sample *sample, RNG &rng, MemoryArena &arena,
+        Intersection *isect = NULL, Spectrum *T = NULL) const;
     Spectrum Li(const Scene *scene, const RayDifferential &ray,
         const Sample *sample, RNG &rng, MemoryArena &arena,
         Intersection *isect = NULL, Spectrum *T = NULL) const;
@@ -58,8 +65,8 @@ private:
     // SamplerRecorderRenderer Private Data
     bool visualizeObjectIds;
     Sampler *sampler;
-    Camera *camera;
-    SurfaceIntegrator *surfaceIntegrator;
+    vector<Camera *>cameras;
+    PathIntegrator *pathIntegrator;
     VolumeIntegrator *volumeIntegrator;
 };
 
@@ -69,20 +76,20 @@ private:
 class SamplerRecorderRendererTask : public Task {
 public:
     // SamplerRecorderRendererTask Public Methods
-    SamplerRecorderRendererTask(const Scene *sc, Renderer *ren, Camera *c,
+    SamplerRecorderRendererTask(const Scene *sc, SamplerRecorderRenderer *ren, vector<Camera *>c,
                         ProgressReporter &pr, Sampler *ms, Sample *sam, 
                         bool visIds, int tn, int tc, int si)
       : reporter(pr)
     {
-        scene = sc; renderer = ren; camera = c; mainSampler = ms;
+        scene = sc; renderer = ren; cameras = c; mainSampler = ms;
 		origSample = sam; visualizeObjectIds = visIds; taskNum = tn; taskCount = tc; sampleIndex = si;
     }
     void Run();
 private:
     // SamplerRecorderRendererTask Private Data
     const Scene *scene;
-    const Renderer *renderer;
-    Camera *camera;
+    const SamplerRecorderRenderer *renderer;
+    vector<Camera *>cameras;
     Sampler *mainSampler;
     ProgressReporter &reporter;
     Sample *origSample;
@@ -95,20 +102,20 @@ private:
 class SamplerAccumulationRendererTask : public Task {
 public:
     // SamplerRendererTask Public Methods
-    SamplerAccumulationRendererTask(const Scene *sc, Renderer *ren, Camera *c,
+    SamplerAccumulationRendererTask(const Scene *sc, SamplerRecorderRenderer *ren, vector<Camera *>c,
                         ProgressReporter &pr, Sampler *ms, Sample *sam, 
                         bool visIds, int tn, int tc)
       : reporter(pr)
     {
-        scene = sc; renderer = ren; camera = c; mainSampler = ms;
+        scene = sc; renderer = ren; cameras = c; mainSampler = ms;
         origSample = sam; visualizeObjectIds = visIds; taskNum = tn; taskCount = tc;
     }
     void Run();
 private:
     // SamplerAccumulationRendererTask Private Data
     const Scene *scene;
-    const Renderer *renderer;
-    Camera *camera;
+    const SamplerRecorderRenderer *renderer;
+    vector<Camera *>cameras;
     Sampler *mainSampler;
     ProgressReporter &reporter;
     Sample *origSample;

@@ -282,12 +282,12 @@ void ImageFilm::WriteImage(float splatScale) {
 }
 
 
-void ImageFilm::WriteImageIndexed(const int& index, float splatScale) {
+void ImageFilm::WriteImageWithSuffix(const string& suffix, float splatScale) {
     
 	string filename_temp = filename;
 	std::stringstream ss;
 	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
-	ss<<filename_no_ending<<"_"<<std::setfill('0') << std::setw(3) <<index<<".exr";
+	ss<<filename_no_ending<<"_"<<suffix<<".exr";
 	filename = ss.str();
 
 	WriteImage(splatScale);
