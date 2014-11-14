@@ -351,22 +351,23 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 
 		// write out samples for direct light
 		ss.str("");
-		ss<<std::setfill('0') << std::setw(3) <<s+1<<"_direct";
+		ss<<"direct_" <<std::setfill('0') << std::setw(3)<<s+1;
 		cameras.at(0)->film->WriteImageWithSuffix(ss.str());
 
 		// write out samples for indirect light
 		ss.str("");
-		ss<<std::setfill('0') << std::setw(3) <<s+1<<"_indirect";
+		ss<<"indirect_"<<std::setfill('0') << std::setw(3)  <<s+1;
 		cameras.at(1)->film->WriteImageWithSuffix(ss.str());
 
 		// write out samples for direct light
 		ss.str("");
-		ss<<std::setfill('0') << std::setw(3) <<s+1<<"_combined";
+		ss <<"combined_"<<std::setfill('0') << std::setw(3) <<s+1;
 		cameras.at(2)->film->WriteImageWithSuffix(ss.str());
 
 		reporter.Done();
 	}
 
+	/*
 	// write accumulated image
 	ProgressReporter reporter(nTasks, "Rendering accumulated Samples");
     vector<Task *> renderTasks;
@@ -385,7 +386,7 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 	cameras.at(0)->film->WriteImageWithSuffix("accum_direct");
 	cameras.at(1)->film->WriteImageWithSuffix("accum_indirect");
 	cameras.at(2)->film->WriteImageWithSuffix("accum_combined");
-
+	*/
 	// Clean up after rendering and store final image
 	PBRT_FINISHED_RENDERING();
 	delete sample;
