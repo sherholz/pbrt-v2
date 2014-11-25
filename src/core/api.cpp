@@ -1255,17 +1255,15 @@ Renderer *RenderOptions::MakeRenderer() const {
         PathIntegrator *pathIntegrator =  CreatePathSurfaceIntegrator(SurfIntegratorParams);
         if (!pathIntegrator) Severe("Unable to create path integrator.");
 
-        VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
-            VolIntegratorParams);
-        if (!volumeIntegrator) Severe("Unable to create volume integrator.");
+        SingleScatteringIntegrator *singleScatteringIntegrator = CreateSingleScatteringIntegrator(VolIntegratorParams);
+        if (!singleScatteringIntegrator) Severe("Unable to create single scattering integrator.");
 
 		vector<Camera *> cameras(3,0);
 		cameras.at(0) = camera;
 		cameras.at(1) = MakeCamera();
 		cameras.at(2) = MakeCamera();
 
-        renderer = new SamplerRecorderRenderer(sampler, cameras, pathIntegrator,
-                                       volumeIntegrator, visIds);
+        renderer = new SamplerRecorderRenderer(sampler, cameras, pathIntegrator,singleScatteringIntegrator, visIds);
         // Warn if no light sources are defined
         if (lights.size() == 0)
             Warning("No light sources defined in scene; "

@@ -42,6 +42,7 @@
 #include "parallel.h"
 
 class PathIntegrator;
+class SingleScatteringIntegrator;
 
 
 // SamplerRecorderRenderer Declarations
@@ -49,7 +50,7 @@ class SamplerRecorderRenderer : public Renderer {
 public:
     // SamplerRecorderRenderer Public Methods
     SamplerRecorderRenderer(Sampler *s, vector<Camera *>c, PathIntegrator *pi,
-                    VolumeIntegrator *vi, bool visIds);
+                    SingleScatteringIntegrator *ssi, bool visIds);
     ~SamplerRecorderRenderer();
     void Render(const Scene *scene);
 	// returns direct (index 0), indirect (index 1) and combined (index 2) illumination 
@@ -67,7 +68,7 @@ private:
     Sampler *sampler;
     vector<Camera *>cameras;
     PathIntegrator *pathIntegrator;
-    VolumeIntegrator *volumeIntegrator;
+    SingleScatteringIntegrator *singleScatteringIntegrator;
 };
 
 

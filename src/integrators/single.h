@@ -52,6 +52,8 @@ public:
         const Scene *scene);
     Spectrum Li(const Scene *, const Renderer *, const RayDifferential &ray,
          const Sample *sample, RNG &rng, Spectrum *T, MemoryArena &arena) const;
+	std::vector<Spectrum> Li_separate(const Scene *, const Renderer *, const RayDifferential &ray,
+         const Sample *sample, RNG &rng, Spectrum *T, MemoryArena &arena) const;
 private:
     // SingleScatteringIntegrator Private Data
     float stepSize;

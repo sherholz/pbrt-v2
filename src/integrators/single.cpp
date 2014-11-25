@@ -138,6 +138,93 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
     return Lv * step;
 }
 
+std::vector<Spectrum> SingleScatteringIntegrator::Li_separate(const Scene *scene, const Renderer *renderer,
+        const RayDifferential &ray, const Sample *sample, RNG &rng,
+        Spectrum *T, MemoryArena &arena) const {
+
+	vector<Spectrum> L_separate(3,0.);
+    VolumeRegion *vr = scene->volumeRegion;
+    float t0, t1;
+    if (!vr || !vr->IntersectP(ray, &t0, &t1) || (t1-t0) == 0.f) {
+        *T = 1.f;
+		L_separate.assign(3,0.0);
+        return L_separate;
+    }
+
+    // Prepare for volume integration stepping
+    int nSamples = Ceil2Int((t1-t0) / stepSize);
+    float step = (t1 - t0) / nSamples;
+    Spectrum Tr(1.f);
+    Point p = ray(t0), pPrev;
+    Vector w = -ray.d;
+    t0 += sample->oneD[scatterSampleOffset][0] * step;
+
+    // Compute sample patterns for single scattering samples
+    float *lightNum = arena.Alloc<float>(nSamples);
+    LDShuffleScrambled1D(1, nSamples, lightNum, rng);
+    float *lightComp = arena.Alloc<float>(nSamples);
+    LDShuffleScrambled1D(1, nSamples, lightComp, rng);
+    float *lightPos = arena.Alloc<float>(2*nSamples);
+    LDShuffleScrambled2D(1, nSamples, lightPos, rng);
+    uint32_t sampOffset = 0;
+    for (int i = 0; i < nSamples; ++i, t0 += step) {
+        // Advance to sample at _t0_ and update _T_
+        pPrev = p;
+        p = ray(t0);
+        Ray tauRay(pPrev, p - pPrev, 0.f, 1.f, ray.time, ray.depth);
+        Spectrum stepTau = vr->tau(tauRay,
+                                   .5f * stepSize, rng.RandomFloat());
+        Tr *= Exp(-stepTau);
+
+        // Possibly terminate ray marching if transmittance is small
+        if (Tr.y() < 1e-3) {
+            const float continueProb = .5f;
+            if (rng.RandomFloat() > continueProb) {
+                Tr = 0.f;
+                break;
+            }
+            Tr /= continueProb;
+        }
+
+        // Compute single-scattering source term at _p_
+        Spectrum source = Tr * vr->Lve(p, w, ray.time);
+		if(i==0){
+			L_separate.at(0)+=source;
+		}else{
+			L_separate.at(1)+=source;
+		}
+		
+		L_separate.at(2)+=source;
+
+        Spectrum ss = vr->sigma_s(p, w, ray.time);
+        if (!ss.IsBlack() && scene->lights.size() > 0) {
+            int nLights = scene->lights.size();
+            int ln = min(Floor2Int(lightNum[sampOffset] * nLights),
+                         nLights-1);
+            Light *light = scene->lights[ln];
+            // Add contribution of _light_ due to scattering at _p_
+            float pdf;
+            VisibilityTester vis;
+            Vector wo;
+            LightSample ls(lightComp[sampOffset], lightPos[2*sampOffset],
+                           lightPos[2*sampOffset+1]);
+            Spectrum L = light->Sample_L(p, 0.f, ls, ray.time, &wo, &pdf, &vis);
+            
+            if (!L.IsBlack() && pdf > 0.f && vis.Unoccluded(scene)) {
+                Spectrum Ld = L * vis.Transmittance(scene, renderer, NULL, rng, arena);
+                Spectrum scatter = Tr * ss * vr->p(p, w, -wo, ray.time) * Ld * float(nLights) /pdf;
+				L_separate.at(1)+=scatter;
+				L_separate.at(2)+=scatter;
+            }
+        }
+        ++sampOffset;
+    }
+    *T = Tr;
+	for(int i=0; i<3;i++) L_separate.at(i)*=step;
+
+	return L_separate;
+}
+
 
 SingleScatteringIntegrator *CreateSingleScatteringIntegrator(const ParamSet &params) {
     float stepSize  = params.FindOneFloat("stepsize", 1.f);

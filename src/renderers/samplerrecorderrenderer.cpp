@@ -38,13 +38,13 @@
 #include "renderers/samplerrecorderrenderer.h"
 #include "scene.h"
 #include "film.h"
-#include "volume.h"
 #include "sampler.h"
 #include "integrator.h"
 #include "progressreporter.h"
 #include "camera.h"
 #include "intersection.h"
 #include "integrators/path.h"
+#include "integrators/single.h"
 
 
 static uint32_t hash(char *key, uint32_t len)
@@ -291,12 +291,12 @@ void SamplerAccumulationRendererTask::Run() {
 
 // SamplerRecorderRenderer Method Definitions
 SamplerRecorderRenderer::SamplerRecorderRenderer(Sampler *s, vector<Camera *>c,
-                                 PathIntegrator *pi, VolumeIntegrator *vi,
+                                 PathIntegrator *pi, SingleScatteringIntegrator *ssi,
                                  bool visIds) {
     sampler = s;
     cameras = c;
 	pathIntegrator = pi;
-    volumeIntegrator = vi;
+    singleScatteringIntegrator = ssi;
     visualizeObjectIds = visIds;
 }
 
@@ -305,7 +305,7 @@ SamplerRecorderRenderer::~SamplerRecorderRenderer() {
     delete sampler;
     for(int j=0; j<cameras.size();j++) delete cameras.at(j);
     delete pathIntegrator;
-    delete volumeIntegrator;
+    delete singleScatteringIntegrator;
 }
 
 
@@ -317,13 +317,13 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 	// Allow integrators to do preprocessing for the scene
 	PBRT_STARTED_PREPROCESSING();
 	for(int j=0; j<cameras.size();j++)pathIntegrator->Preprocess(scene, cameras.at(j), this);
-	for(int j=0; j<cameras.size();j++)volumeIntegrator->Preprocess(scene, cameras.at(j), this);
+	for(int j=0; j<cameras.size();j++)singleScatteringIntegrator->Preprocess(scene, cameras.at(j), this);
 	PBRT_FINISHED_PREPROCESSING();
 
 	PBRT_STARTED_RENDERING();
 	// Allocate and initialize _sample_
 	Sample *sample = new Sample(sampler, pathIntegrator,
-								volumeIntegrator, scene);
+								singleScatteringIntegrator, scene);
 
 	// Compute number of _SamplerRendererTask_s to create for rendering
 	int nPixels = cameras.at(0)->film->xResolution * cameras.at(0)->film->yResolution;
@@ -400,22 +400,27 @@ vector<Spectrum> SamplerRecorderRenderer::Li_separated(const Scene *scene,
     Assert(!ray.HasNaNs());
 
     // Allocate local variable for _isect_ if needed
-
+	Spectrum localT;
+    if (!T) T = &localT;
     Intersection localIsect;
     if (!isect) isect = &localIsect;
     vector<Spectrum> Li (3,0.);
     if (scene->Intersect(ray, isect))
-		Li = pathIntegrator->Li_separate(scene, this, ray, *isect, sample,
-                                   rng, arena);
+		Li = pathIntegrator->Li_separate(scene, this, ray, *isect, sample, rng, arena);
     else {
         // Handle ray that doesn't intersect any geometry
         for (uint32_t i = 0; i < scene->lights.size(); ++i)
 			for (uint32_t j = 0; j < Li.size(); ++j)
 				Li.at(j) += scene->lights[i]->Le(ray);
     }
+	vector<Spectrum> Lvi (3,0.);
+	Lvi = singleScatteringIntegrator->Li_separate(scene, this, ray, sample, rng,T, arena);
 
-    return Li;
+	vector<Spectrum> Li_final(3,0.);
+	for(int i=0; i<3;i++) Li_final.at(i) = Li.at(i)+Lvi.at(i);
+    return Li_final;
 }
+
 
 Spectrum SamplerRecorderRenderer::Li(const Scene *scene,
         const RayDifferential &ray, const Sample *sample, RNG &rng,
@@ -436,7 +441,7 @@ Spectrum SamplerRecorderRenderer::Li(const Scene *scene,
         for (uint32_t i = 0; i < scene->lights.size(); ++i)
            Li += scene->lights[i]->Le(ray);
     }
-    Spectrum Lvi = volumeIntegrator->Li(scene, this, ray, sample, rng,
+    Spectrum Lvi = singleScatteringIntegrator->Li(scene, this, ray, sample, rng,
                                         T, arena);
     return *T * Li + Lvi;
 }
@@ -445,7 +450,7 @@ Spectrum SamplerRecorderRenderer::Li(const Scene *scene,
 Spectrum SamplerRecorderRenderer::Transmittance(const Scene *scene,
         const RayDifferential &ray, const Sample *sample, RNG &rng,
         MemoryArena &arena) const {
-    return volumeIntegrator->Transmittance(scene, this, ray, sample,
+    return singleScatteringIntegrator->Transmittance(scene, this, ray, sample,
                                            rng, arena);
 }
 
