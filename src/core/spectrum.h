@@ -489,7 +489,7 @@ public:
 
 	Spectrum& operator[](const RenderPassType &pass);
     const Spectrum& operator[](const RenderPassType &idx) const;
-	SpectrumContainer& SpectrumContainer::operator=(const Spectrum& spec);
+	SpectrumContainer& operator=(const Spectrum& spec);
     SpectrumContainer& operator*=(const float &val);
 
 private:

@@ -128,6 +128,9 @@
 #include <map>
 #include <vector>
 #include <sstream>
+
+#include <iterator>
+
  #if (_MSC_VER >= 1400)
  #include <stdio.h>
  #define snprintf _snprintf
