@@ -332,7 +332,7 @@ void SamplerRenderer::Render(const Scene *scene) {
 
 	// write out all render passes
 	for(size_t i=0; i<camera->GetNumRenderPasses();i++){
-		camera->GetRenderPass(i)->WriteImage();
+		camera->GetRenderPass(i)->WriteRenderPass();
 	}
 
     // Clean up after rendering and store final image

@@ -244,7 +244,7 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 
 		// write out all render passes
 		for(size_t i=0; i<camera->GetNumRenderPasses();i++){
-			camera->GetRenderPass(i)->WriteImageIndexed(s+1);
+			camera->GetRenderPass(i)->WriteRenderPassIndexed(s+1);
 		}
 	}
 	

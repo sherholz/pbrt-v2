@@ -243,28 +243,31 @@ void ImageFilm::GetPixelExtent(int *xstart, int *xend,
     *yend   = yPixelStart + yPixelCount;
 }
 
-string Helper_GetRenderPassSuffix(RenderPassType pass){
+string Helper_GetFileName(string& filename, RenderPassType& pass, int index = -1){
+
 	string suffix = "";
+
 	switch(pass){
-	case BEAUTY:	return "beauty";
-	case DIRECT:	return "direct";
-	case INDIRECT:	return "indirect";
-	case NORMAL:	return "normal";
-	case PRIMITIVES:return "primitives";
-	case DEPTH:		return "depth";
-	default:		return "unknown";
-	}
+		case BEAUTY:	suffix = "beauty"; break;
+		case DIRECT:	suffix = "direct"; break;
+		case INDIRECT:	suffix = "indirect"; break;
+		case NORMAL:	suffix = "normal"; break;
+		case PRIMITIVES:suffix = "primitives"; break;
+		case DEPTH:		suffix = "depth"; break;
+		default:		suffix = "unknown"; break;
+	} 
+
+	std::stringstream ss;
+	string filename_no_ending = filename.substr(0,filename.find(".exr"));
+
+	ss<<filename_no_ending<<"_"<<suffix;
+	if(index>=0) ss<<"_"<<std::setfill('0') << std::setw(3)<<index;
+	ss<<".exr";
+	return ss.str();
 }
 
 
 void ImageFilm::WriteImage(float splatScale) {
-
-	string suffix = Helper_GetRenderPassSuffix(renderPassType);
-	string filename_temp = filename;
-	std::stringstream ss;
-	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
-	ss<<filename_no_ending<<"_"<<suffix<<".exr";
-	filename = ss.str();
 
     // Convert image to RGB and compute final pixel values
     int nPix = xPixelCount * yPixelCount;
@@ -298,24 +301,23 @@ void ImageFilm::WriteImage(float splatScale) {
     ::WriteImage(filename, rgb, NULL, xPixelCount, yPixelCount,
                  xResolution, yResolution, xPixelStart, yPixelStart);
 
-	filename = filename_temp;
-
     // Release temporary image memory
     delete[] rgb;
 }
 
-void ImageFilm::WriteImageIndexed(const unsigned int index, float splatScale) {
+void ImageFilm::WriteRenderPassIndexed(const unsigned int index, float splatScale) {
 	string filename_temp = filename;
-	std::stringstream ss;
-	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
-	ss<<filename_no_ending<<"_"<<std::setfill('0') << std::setw(3)<<index<<".exr";
-	filename = ss.str();
-
+	filename = Helper_GetFileName(filename_temp,renderPassType,(int)index);
 	WriteImage(splatScale);
-
 	filename = filename_temp;
 }
 
+void ImageFilm::WriteRenderPass(float splatScale) {
+	string filename_temp = filename;
+	filename = Helper_GetFileName(filename_temp,renderPassType);
+	WriteImage(splatScale);
+	filename = filename_temp;
+}
 
 void ImageFilm::UpdateDisplay(int x0, int y0, int x1, int y1,
     float splatScale) {
