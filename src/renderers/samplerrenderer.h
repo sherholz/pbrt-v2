@@ -41,6 +41,8 @@
 #include "renderer.h"
 #include "parallel.h"
 
+#include "spectrum.h"
+
 class PathIntegrator;
 class SingleScatteringIntegrator;
 
