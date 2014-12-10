@@ -39,6 +39,7 @@
 // core/spectrum.h*
 #include "pbrt.h"
 #include "parallel.h"
+#include <map>
 
 // Spectrum Utility Declarations
 static const int sampledLambdaStart = 400;
@@ -467,6 +468,35 @@ Pow(const CoefficientSpectrum<nSamples> &s, float e) {
 inline Spectrum Lerp(float t, const Spectrum &s1, const Spectrum &s2) {
     return (1.f - t) * s1 + t * s2;
 }
+
+
+// Container for managing spectra of different render passes
+class SpectrumContainer{
+public:
+	SpectrumContainer();
+	SpectrumContainer(vector<RenderPassType>& passes);
+	virtual ~SpectrumContainer();
+
+	void SetRenderPassTypes(vector<RenderPassType>& passes);
+	Spectrum& GetSpectrum(RenderPassType pass);
+	Spectrum& GetNextSpectrum();
+	Spectrum& GetFirstSpectrum();
+	bool HasNextSpectrum() const;
+	bool ContainsSpectrum(RenderPassType pass) const;
+
+	void SetSpectrum(RenderPassType pass, const Spectrum& s);
+	void Clear(const Spectrum& s = Spectrum(0.));
+
+	Spectrum& operator[](const RenderPassType &pass);
+    const Spectrum& operator[](const RenderPassType &idx) const;
+	SpectrumContainer& SpectrumContainer::operator=(const Spectrum& spec);
+    SpectrumContainer& operator*=(const float &val);
+
+private:
+	std::map<RenderPassType, Spectrum> spectraMap;
+	std::map<RenderPassType,Spectrum>::iterator itr;
+	Spectrum defaultSpec;
+};
 
 
 

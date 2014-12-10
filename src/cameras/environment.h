@@ -45,14 +45,14 @@ class EnvironmentCamera : public Camera {
 public:
     // EnvironmentCamera Public Methods
     EnvironmentCamera(const AnimatedTransform &cam2world, float sopen,
-                      float sclose, Film *film)
-        : Camera(cam2world, sopen, sclose, film) {
+                      float sclose, vector<Film *>renderPasses)
+        : Camera(cam2world, sopen, sclose, renderPasses) {
     }
     float GenerateRay(const CameraSample &sample, Ray *) const;
 };
 
 
 EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film);
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses);
 
 #endif // PBRT_CAMERAS_ENVIRONMENT_H

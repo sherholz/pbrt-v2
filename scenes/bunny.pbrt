@@ -2,9 +2,9 @@ Renderer "samplerlightseparation" "integer samplesperpixel" [32]
 
 
 Film "image"
-#	"integer xresolution" [128] "integer yresolution" [128] 
+	"integer xresolution" [64] "integer yresolution" [64] 
 LookAt 0 .2 .2    -.02 .1 0  0 1 0
-Camera "perspective" "float fov" [60]
+Camera "perspective" "float fov" [60] "string renderpasses" "beauty direct indirect normal depth shapeID"
 
 WorldBegin
 

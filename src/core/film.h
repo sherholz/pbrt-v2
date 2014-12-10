@@ -43,8 +43,8 @@
 class Film {
 public:
     // Film Interface
-    Film(int xres, int yres)
-        : xResolution(xres), yResolution(yres) { }
+	Film(int xres, int yres, RenderPassType pass = BEAUTY)
+        : xResolution(xres), yResolution(yres), renderPassType(pass) { }
     virtual ~Film();
     virtual void AddSample(const CameraSample &sample,
                            const Spectrum &L) = 0;
@@ -57,10 +57,14 @@ public:
                                 int *ystart, int *yend) const = 0;
     virtual void UpdateDisplay(int x0, int y0, int x1, int y1, float splatScale = 1.f);
     virtual void WriteImage(float splatScale = 1.f) = 0;
-	virtual void WriteImageWithSuffix(const string& suffix, float splatScale = 1.f) = 0;
+	virtual void WriteImageIndexed(const unsigned int index, float splatScale = 1.f) = 0;
+	virtual RenderPassType GetRenderPassType(){return renderPassType;}
 
     // Film Public Data
     const int xResolution, yResolution;
+
+protected:
+	RenderPassType renderPassType;
 };
 
 

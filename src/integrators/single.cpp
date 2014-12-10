@@ -138,17 +138,16 @@ Spectrum SingleScatteringIntegrator::Li(const Scene *scene, const Renderer *rend
     return Lv * step;
 }
 
-std::vector<Spectrum> SingleScatteringIntegrator::Li_separate(const Scene *scene, const Renderer *renderer,
+void SingleScatteringIntegrator::Li_separate(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Sample *sample, RNG &rng,
-        Spectrum *T, MemoryArena &arena) const {
+		Spectrum *T, MemoryArena &arena, SpectrumContainer& L_io) const {
 
-	vector<Spectrum> L_separate(3,0.);
     VolumeRegion *vr = scene->volumeRegion;
+	L_io.Clear(Spectrum(0.));
     float t0, t1;
     if (!vr || !vr->IntersectP(ray, &t0, &t1) || (t1-t0) == 0.f) {
         *T = 1.f;
-		L_separate.assign(3,0.0);
-        return L_separate;
+        return;
     }
 
     // Prepare for volume integration stepping
@@ -189,12 +188,12 @@ std::vector<Spectrum> SingleScatteringIntegrator::Li_separate(const Scene *scene
         // Compute single-scattering source term at _p_
         Spectrum source = Tr * vr->Lve(p, w, ray.time);
 		if(i==0){
-			L_separate.at(0)+=source;
+			L_io[DIRECT]+=source;
 		}else{
-			L_separate.at(1)+=source;
+			L_io[INDIRECT]+=source;
 		}
 		
-		L_separate.at(2)+=source;
+		L_io[BEAUTY]+=source;
 
         Spectrum ss = vr->sigma_s(p, w, ray.time);
         if (!ss.IsBlack() && scene->lights.size() > 0) {
@@ -213,16 +212,14 @@ std::vector<Spectrum> SingleScatteringIntegrator::Li_separate(const Scene *scene
             if (!L.IsBlack() && pdf > 0.f && vis.Unoccluded(scene)) {
                 Spectrum Ld = L * vis.Transmittance(scene, renderer, NULL, rng, arena);
                 Spectrum scatter = Tr * ss * vr->p(p, w, -wo, ray.time) * Ld * float(nLights) /pdf;
-				L_separate.at(1)+=scatter;
-				L_separate.at(2)+=scatter;
+				L_io[INDIRECT]+=scatter;
+				L_io[BEAUTY]+=scatter;
             }
         }
         ++sampOffset;
     }
     *T = Tr;
-	for(int i=0; i<3;i++) L_separate.at(i)*=step;
-
-	return L_separate;
+	L_io*=step;
 }
 
 

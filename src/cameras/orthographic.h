@@ -46,7 +46,7 @@ class OrthoCamera : public ProjectiveCamera {
 public:
     // OrthoCamera Public Methods
     OrthoCamera(const AnimatedTransform &cam2world, const float screenWindow[4],
-        float sopen, float sclose, float lensr, float focald, Film *film);
+        float sopen, float sclose, float lensr, float focald, vector<Film *>renderPasses);
     float GenerateRay(const CameraSample &sample, Ray *) const;
     float GenerateRayDifferential(const CameraSample &sample, RayDifferential *) const;
 private:
@@ -56,6 +56,6 @@ private:
 
 
 OrthoCamera *CreateOrthographicCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film);
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses);
 
 #endif // PBRT_CAMERAS_ORTHOGRAPHIC_H

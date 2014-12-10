@@ -51,7 +51,7 @@ float EnvironmentCamera::GenerateRay(const CameraSample &sample,
 
 
 EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film) {
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses) {
     // Extract common camera parameters from _ParamSet_
     float shutteropen = params.FindOneFloat("shutteropen", 0.f);
     float shutterclose = params.FindOneFloat("shutterclose", 1.f);
@@ -63,7 +63,7 @@ EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
     float lensradius = params.FindOneFloat("lensradius", 0.f);
     float focaldistance = params.FindOneFloat("focaldistance", 1e30f);
     float frame = params.FindOneFloat("frameaspectratio",
-        float(film->xResolution)/float(film->yResolution));
+        float(renderPasses.at(0)->xResolution)/float(renderPasses.at(0)->yResolution));
     float screen[4];
     if (frame > 1.f) {
         screen[0] = -frame;
@@ -83,7 +83,7 @@ EnvironmentCamera *CreateEnvironmentCamera(const ParamSet &params,
         memcpy(screen, sw, 4*sizeof(float));
     (void) lensradius; // don't need this
     (void) focaldistance; // don't need this
-    return new EnvironmentCamera(cam2world, shutteropen, shutterclose, film);
+    return new EnvironmentCamera(cam2world, shutteropen, shutterclose, renderPasses);
 }
 
 

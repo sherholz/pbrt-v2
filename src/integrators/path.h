@@ -49,9 +49,9 @@ public:
         const Sample *sample, RNG &rng, MemoryArena &arena) const;
 
 	// returns direct (index 0), indirect (index 1) and combined (index 2) illumination 
-	vector<Spectrum> Li_separate(const Scene *scene, const Renderer *renderer,
+	void Li_separate(const Scene *scene, const Renderer *renderer,
         const RayDifferential &ray, const Intersection &isect,
-        const Sample *sample, RNG &rng, MemoryArena &arena) const;
+        const Sample *sample, RNG &rng, MemoryArena &arena, SpectrumContainer& L_io) const;
     void RequestSamples(Sampler *sampler, Sample *sample, const Scene *scene);
     PathIntegrator(int md) { maxDepth = md; }
 private:

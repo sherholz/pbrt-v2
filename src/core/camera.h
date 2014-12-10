@@ -41,21 +41,33 @@
 #include "geometry.h"
 #include "transform.h"
 
+
 // Camera Declarations
 class Camera {
 public:
     // Camera Interface
     Camera(const AnimatedTransform &cam2world, float sopen, float sclose,
-           Film *film);
+           vector<Film *>renderPasses);
     virtual ~Camera();
     virtual float GenerateRay(const CameraSample &sample,
                               Ray *ray) const = 0;
     virtual float GenerateRayDifferential(const CameraSample &sample, RayDifferential *rd) const;
 
+	virtual unsigned int GetNumRenderPasses();
+	virtual vector<RenderPassType> GetRenderPassTypes();
+	virtual Film* GetRenderPass(const unsigned int index);
+	
     // Camera Public Data
     AnimatedTransform CameraToWorld;
     const float shutterOpen, shutterClose;
-    Film *film;
+
+	// deprecated!
+	Film* film;
+
+private:
+	// collection of available render passes
+	vector<Film*> renderPasses;
+	
 };
 
 
@@ -64,7 +76,7 @@ public:
     // ProjectiveCamera Public Methods
     ProjectiveCamera(const AnimatedTransform &cam2world,
         const Transform &proj, const float screenWindow[4],
-        float sopen, float sclose, float lensr, float focald, Film *film);
+        float sopen, float sclose, float lensr, float focald, vector<Film *>renderPasses);
 protected:
     // ProjectiveCamera Protected Data
     Transform CameraToScreen, RasterToCamera;

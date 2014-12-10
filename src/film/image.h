@@ -48,7 +48,7 @@ class ImageFilm : public Film {
 public:
     // ImageFilm Public Methods
     ImageFilm(int xres, int yres, Filter *filt, const float crop[4],
-              const string &filename, bool openWindow);
+              const string &filename, bool openWindow, RenderPassType pass = BEAUTY);
     ~ImageFilm() {
         delete pixels;
         delete filter;
@@ -60,7 +60,7 @@ public:
     void GetSampleExtent(int *xstart, int *xend, int *ystart, int *yend) const;
     void GetPixelExtent(int *xstart, int *xend, int *ystart, int *yend) const;
     void WriteImage(float splatScale);
-	void WriteImageWithSuffix(const string& suffix, float splatScale);
+	void WriteImageIndexed(const unsigned int index, float splatScale);
     void UpdateDisplay(int x0, int y0, int x1, int y1, float splatScale);
 	
 private:
@@ -84,6 +84,6 @@ private:
 };
 
 
-ImageFilm *CreateImageFilm(const ParamSet &params, Filter *filter);
+ImageFilm *CreateImageFilm(const ParamSet &params, Filter *filter, RenderPassType pass = BEAUTY);
 
 #endif // PBRT_FILM_IMAGE_H

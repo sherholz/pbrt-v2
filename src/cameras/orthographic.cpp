@@ -40,9 +40,9 @@
 // OrthographicCamera Definitions
 OrthoCamera::OrthoCamera(const AnimatedTransform &cam2world,
         const float screenWindow[4], float sopen, float sclose,
-        float lensr, float focald, Film *f)
+        float lensr, float focald, vector<Film *>renderPasses)
     : ProjectiveCamera(cam2world, Orthographic(0., 1.), screenWindow,
-                       sopen, sclose, lensr, focald, f) {
+                       sopen, sclose, lensr, focald, renderPasses) {
     // Compute differential changes in origin for ortho camera rays
     dxCamera = RasterToCamera(Vector(1, 0, 0));
     dyCamera = RasterToCamera(Vector(0, 1, 0));
@@ -136,7 +136,7 @@ float OrthoCamera::GenerateRayDifferential(const CameraSample &sample,
 
 
 OrthoCamera *CreateOrthographicCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film) {
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses) {
     // Extract common camera parameters from _ParamSet_
     float shutteropen = params.FindOneFloat("shutteropen", 0.f);
     float shutterclose = params.FindOneFloat("shutterclose", 1.f);
@@ -148,7 +148,7 @@ OrthoCamera *CreateOrthographicCamera(const ParamSet &params,
     float lensradius = params.FindOneFloat("lensradius", 0.f);
     float focaldistance = params.FindOneFloat("focaldistance", 1e30f);
     float frame = params.FindOneFloat("frameaspectratio",
-        float(film->xResolution)/float(film->yResolution));
+        float(renderPasses.at(0)->xResolution)/float(renderPasses.at(0)->yResolution));
     float screen[4];
     if (frame > 1.f) {
         screen[0] = -frame;
@@ -167,7 +167,7 @@ OrthoCamera *CreateOrthographicCamera(const ParamSet &params,
     if (sw && swi == 4)
         memcpy(screen, sw, 4*sizeof(float));
     return new OrthoCamera(cam2world, screen, shutteropen, shutterclose,
-        lensradius, focaldistance, film);
+        lensradius, focaldistance, renderPasses);
 }
 
 

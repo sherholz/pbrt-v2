@@ -126,6 +126,8 @@
 #include "volumes/homogeneous.h"
 #include "volumes/volumegrid.h"
 #include <map>
+#include <vector>
+#include <sstream>
  #if (_MSC_VER >= 1400)
  #include <stdio.h>
  #define snprintf _snprintf
@@ -578,6 +580,26 @@ VolumeIntegrator *MakeVolumeIntegrator(const string &name,
 }
 
 
+Filter *MakeFilter(const string &name,
+    const ParamSet &paramSet) {
+    Filter *filter = NULL;
+    if (name == "box")
+        filter = CreateBoxFilter(paramSet);
+    else if (name == "gaussian")
+        filter = CreateGaussianFilter(paramSet);
+    else if (name == "mitchell")
+        filter = CreateMitchellFilter(paramSet);
+    else if (name == "sinc")
+        filter = CreateSincFilter(paramSet);
+    else if (name == "triangle")
+        filter = CreateTriangleFilter(paramSet);
+    else
+        Warning("Filter \"%s\" unknown.", name.c_str());
+    paramSet.ReportUnused();
+    return filter;
+}
+
+
 Primitive *MakeAccelerator(const string &name,
         const vector<Reference<Primitive> > &prims,
         const ParamSet &paramSet) {
@@ -594,11 +616,59 @@ Primitive *MakeAccelerator(const string &name,
     return accel;
 }
 
+Film *MakeFilm(const string &filmName,const ParamSet &filmParamSet, 
+			   const string &filterName,const ParamSet &filterParamSet, 
+			   RenderPassType pass = BEAUTY) {
+	Filter *filter = MakeFilter(filterName, filterParamSet);
+    Film *film = NULL;
+    if (filmName == "image")
+        film = CreateImageFilm(filmParamSet, filter, pass);
+    else
+        Warning("Film \"%s\" unknown.", filmName.c_str());
+    filmParamSet.ReportUnused();
+    return film;
+}
+
+vector<Film*> MakeRenderPasses(const ParamSet &cameraParamSet,
+		const string &filmName,
+		const ParamSet &filmParamSet,
+		const string &filterName,
+		const ParamSet &filterParamSet){
+
+	string renderPassesString = cameraParamSet.FindOneString("renderpasses", "beauty");
+
+	std::stringstream renderPassesStream(renderPassesString);
+	std::istream_iterator<std::string> begin(renderPassesStream);
+	std::istream_iterator<std::string> end;
+	std::vector<std::string> renderPassesVec(begin, end);
+	vector<Film*> render_passes;
+	
+	for(int i=0; i<renderPassesVec.size();i++){
+		RenderPassType pass = BEAUTY;
+		     if (renderPassesVec.at(i).compare("direct")==0)   pass = DIRECT;
+		else if (renderPassesVec.at(i).compare("indirect")==0) pass = INDIRECT;
+		else if (renderPassesVec.at(i).compare("normal")==0)   pass = NORMAL;
+		else if (renderPassesVec.at(i).compare("depth")==0)    pass = DEPTH;
+		else if (renderPassesVec.at(i).compare("primitives")==0)  pass = PRIMITIVES;
+		
+		Film *film = MakeFilm(filmName, filmParamSet, filterName, filterParamSet, pass);
+		if (!film) Severe("Unable to create film.");
+		render_passes.push_back(film);
+	}
+	return render_passes;
+}    
 
 Camera *MakeCamera(const string &name,
-        const ParamSet &paramSet,
+        const ParamSet &cameraParamSet,
+		const string &filmName,
+		const ParamSet &filmParamSet,
+		const string &filterName,
+		const ParamSet &filterParamSet,
         const TransformSet &cam2worldSet, float transformStart,
-        float transformEnd, Film *film) {
+        float transformEnd) {
+
+	vector<Film*> renderPasses = MakeRenderPasses(cameraParamSet,filmName, filmParamSet,filterName, filterParamSet);
+
     Camera *camera = NULL;
     Assert(MAX_TRANSFORMS == 2);
     Transform *cam2world[2];
@@ -607,14 +677,14 @@ Camera *MakeCamera(const string &name,
     AnimatedTransform animatedCam2World(cam2world[0], transformStart,
         cam2world[1], transformEnd);
     if (name == "perspective")
-        camera = CreatePerspectiveCamera(paramSet, animatedCam2World, film);
+        camera = CreatePerspectiveCamera(cameraParamSet, animatedCam2World, renderPasses);
     else if (name == "orthographic")
-        camera = CreateOrthographicCamera(paramSet, animatedCam2World, film);
+        camera = CreateOrthographicCamera(cameraParamSet, animatedCam2World, renderPasses);
     else if (name == "environment")
-        camera = CreateEnvironmentCamera(paramSet, animatedCam2World, film);
+        camera = CreateEnvironmentCamera(cameraParamSet, animatedCam2World, renderPasses);
     else
         Warning("Camera \"%s\" unknown.", name.c_str());
-    paramSet.ReportUnused();
+    cameraParamSet.ReportUnused();
     return camera;
 }
 
@@ -639,40 +709,6 @@ Sampler *MakeSampler(const string &name,
     paramSet.ReportUnused();
     return sampler;
 }
-
-
-Filter *MakeFilter(const string &name,
-    const ParamSet &paramSet) {
-    Filter *filter = NULL;
-    if (name == "box")
-        filter = CreateBoxFilter(paramSet);
-    else if (name == "gaussian")
-        filter = CreateGaussianFilter(paramSet);
-    else if (name == "mitchell")
-        filter = CreateMitchellFilter(paramSet);
-    else if (name == "sinc")
-        filter = CreateSincFilter(paramSet);
-    else if (name == "triangle")
-        filter = CreateTriangleFilter(paramSet);
-    else
-        Warning("Filter \"%s\" unknown.", name.c_str());
-    paramSet.ReportUnused();
-    return filter;
-}
-
-
-Film *MakeFilm(const string &name,
-    const ParamSet &paramSet, Filter *filter) {
-    Film *film = NULL;
-    if (name == "image")
-        film = CreateImageFilm(paramSet, filter);
-    else
-        Warning("Film \"%s\" unknown.", name.c_str());
-    paramSet.ReportUnused();
-    return film;
-}
-
-
 
 // API Function Definitions
 void pbrtInit(const Options &opt) {
@@ -1258,12 +1294,7 @@ Renderer *RenderOptions::MakeRenderer() const {
         SingleScatteringIntegrator *singleScatteringIntegrator = CreateSingleScatteringIntegrator(VolIntegratorParams);
         if (!singleScatteringIntegrator) Severe("Unable to create single scattering integrator.");
 
-		vector<Camera *> cameras(3,0);
-		cameras.at(0) = camera;
-		cameras.at(1) = MakeCamera();
-		cameras.at(2) = MakeCamera();
-
-        renderer = new SamplerRecorderRenderer(sampler, cameras, pathIntegrator,singleScatteringIntegrator, visIds);
+        renderer = new SamplerRecorderRenderer(sampler, camera, pathIntegrator,singleScatteringIntegrator);
         // Warn if no light sources are defined
         if (lights.size() == 0)
             Warning("No light sources defined in scene; "
@@ -1279,14 +1310,24 @@ Renderer *RenderOptions::MakeRenderer() const {
         Sampler *sampler = MakeSampler(SamplerName, SamplerParams, camera->film, camera);
         if (!sampler) Severe("Unable to create sampler.");
         // Create surface and volume integrators
+		/*
         SurfaceIntegrator *surfaceIntegrator = MakeSurfaceIntegrator(SurfIntegratorName,
             SurfIntegratorParams);
         if (!surfaceIntegrator) Severe("Unable to create surface integrator.");
         VolumeIntegrator *volumeIntegrator = MakeVolumeIntegrator(VolIntegratorName,
             VolIntegratorParams);
         if (!volumeIntegrator) Severe("Unable to create volume integrator.");
-        renderer = new SamplerRenderer(sampler, camera, surfaceIntegrator,
-                                       volumeIntegrator, visIds);
+		*/
+
+		// !! HACK: explicitly create pathintegrator instead of surfaceintegrator
+        PathIntegrator *pathIntegrator =  CreatePathSurfaceIntegrator(SurfIntegratorParams);
+        if (!pathIntegrator) Severe("Unable to create path integrator.");
+
+        SingleScatteringIntegrator *singleScatteringIntegrator = CreateSingleScatteringIntegrator(VolIntegratorParams);
+        if (!singleScatteringIntegrator) Severe("Unable to create single scattering integrator.");
+
+        renderer = new SamplerRenderer(sampler, camera, pathIntegrator,
+                                       singleScatteringIntegrator);
         // Warn if no light sources are defined
         if (lights.size() == 0)
             Warning("No light sources defined in scene; "
@@ -1297,12 +1338,8 @@ Renderer *RenderOptions::MakeRenderer() const {
 
 
 Camera *RenderOptions::MakeCamera() const {
-    Filter *filter = MakeFilter(FilterName, FilterParams);
-    Film *film = MakeFilm(FilmName, FilmParams, filter);
-    if (!film) Severe("Unable to create film.");
-    Camera *camera = ::MakeCamera(CameraName, CameraParams,
-        CameraToWorld, renderOptions->transformStartTime,
-        renderOptions->transformEndTime, film);
+	Camera *camera = ::MakeCamera(CameraName, CameraParams, FilmName, FilmParams, FilterName, FilterParams, 
+		CameraToWorld, renderOptions->transformStartTime, renderOptions->transformEndTime);
     if (!camera) Severe("Unable to create camera.");
     return camera;
 }

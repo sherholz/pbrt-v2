@@ -1,13 +1,14 @@
 
 LookAt 18 5.5 2    15.5 .9 10   0 1 0
-Camera "perspective" "float fov" [40]
+Camera "perspective" "float fov" [40] "string renderpasses" "beauty direct indirect normal depth primitives"
 
-Sampler "lowdiscrepancy" "integer pixelsamples" [32]
+Sampler "lowdiscrepancy" "integer pixelsamples" [64]
 PixelFilter "box"
 
 Film "image" "integer xresolution" [256] "integer yresolution" [256]
+	
 
-Renderer "samplerrecorder" "integer samplesperpixel" [32] 
+Renderer "sampler" "integer samplesperpixel" [64] 
 
 WorldBegin
 

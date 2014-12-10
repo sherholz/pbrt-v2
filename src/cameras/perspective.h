@@ -47,7 +47,7 @@ public:
     // PerspectiveCamera Public Methods
     PerspectiveCamera(const AnimatedTransform &cam2world,
         const float screenWindow[4], float sopen, float sclose,
-        float lensr, float focald, float fov, Film *film);
+        float lensr, float focald, float fov, vector<Film *>renderPasses);
     float GenerateRay(const CameraSample &sample, Ray *) const;
     float GenerateRayDifferential(const CameraSample &sample,
                                   RayDifferential *ray) const;
@@ -58,6 +58,6 @@ private:
 
 
 PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film);
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses);
 
 #endif // PBRT_CAMERAS_PERSPECTIVE_H

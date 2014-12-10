@@ -192,6 +192,7 @@ SampledSpectrum::SampledSpectrum(const RGBSpectrum &r, SpectrumType t) {
 }
 
 
+
 void Blackbody(const float *wl, int n, float temp, float *vals) {
     if (temp <= 0) {
         for (int i = 0; i < n; ++i) vals[i] = 0.f;
@@ -217,6 +218,110 @@ float InterpolateSpectrumSamples(const float *lambda, const float *vals,
     }
     Severe("Fatal logic error in InterpolateSpectrumSamples()");
     return 0.f;
+}
+
+
+
+// Spectrum Container Implementation
+SpectrumContainer::SpectrumContainer(vector<RenderPassType>& passes){
+	for(int i=0; i<passes.size();i++)
+		spectraMap.insert( std::pair<RenderPassType,Spectrum>(passes.at(i),Spectrum()) );
+
+	itr = spectraMap.begin();
+	defaultSpec = Spectrum(0.);
+}
+
+SpectrumContainer::SpectrumContainer(){
+	defaultSpec = Spectrum(0.);
+}
+
+SpectrumContainer::~SpectrumContainer(){
+	spectraMap.clear();
+}
+
+void SpectrumContainer::SetRenderPassTypes(vector<RenderPassType>& passes){
+	spectraMap.clear();
+	for(int i=0; i<passes.size();i++)
+		spectraMap.insert( std::pair<RenderPassType,Spectrum>(passes.at(i),Spectrum()) );
+
+	itr = spectraMap.begin();
+}
+
+void SpectrumContainer::Clear(const Spectrum& spec){
+	typedef std::map<RenderPassType,Spectrum>::iterator iterator;
+	for (iterator it=spectraMap.begin(); it!=spectraMap.end(); ++it){
+		spectraMap.at(it->first)=spec;
+	}
+}
+
+void SpectrumContainer::SetSpectrum(RenderPassType pass, const Spectrum& s){
+	if(spectraMap.count(pass)>0){
+		spectraMap.at(pass) = s;
+	}
+}
+
+Spectrum& SpectrumContainer::GetNextSpectrum(){
+	itr++;
+	if(itr!=spectraMap.end()){
+		return itr->second;
+	}
+	return defaultSpec;
+}
+
+Spectrum& SpectrumContainer::GetFirstSpectrum(){
+	itr = spectraMap.begin();
+	return itr->second;
+}
+
+bool SpectrumContainer::HasNextSpectrum() const{
+	bool test= itr!=spectraMap.end();
+	return test;
+}
+
+Spectrum& SpectrumContainer::GetSpectrum(RenderPassType pass){
+	if(spectraMap.count(pass)>0){
+		return spectraMap.at(pass);
+	}
+	return defaultSpec;
+}
+
+bool SpectrumContainer::ContainsSpectrum(RenderPassType pass) const{
+	return spectraMap.count(pass)>0;
+}
+
+
+Spectrum& SpectrumContainer::operator[](const RenderPassType &pass)
+{
+	if(spectraMap.count(pass)>0){
+		return spectraMap.at(pass);
+	}
+	return defaultSpec;
+}
+
+const Spectrum& SpectrumContainer::operator[](const RenderPassType &pass) const
+{
+	if(spectraMap.count(pass)>0){
+		return spectraMap.at(pass);
+	}
+	return defaultSpec;
+}
+
+SpectrumContainer& SpectrumContainer::operator*=(const float& val)
+{
+	typedef std::map<RenderPassType,Spectrum>::iterator iterator;
+	for (iterator it=spectraMap.begin(); it!=spectraMap.end(); ++it){
+		spectraMap.at(it->first)*=val;
+	}
+	return (*this);
+}
+
+SpectrumContainer& SpectrumContainer::operator=(const Spectrum& spec)
+{
+	typedef std::map<RenderPassType,Spectrum>::iterator iterator;
+	for (iterator it=spectraMap.begin(); it!=spectraMap.end(); ++it){
+		spectraMap.at(it->first)=spec;
+	}
+	return (*this);
 }
 
 

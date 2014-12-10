@@ -84,7 +84,7 @@ void SamplerRecorderRendererTask::Run() {
     Sample *samples = origSample->Duplicate(maxSamples);
     RayDifferential ray;
     Spectrum T;
-	vector<Spectrum> L(3,0.);
+	SpectrumContainer L(camera->GetRenderPassTypes());
     Intersection isect;
 
     // Get samples from _Sampler_ and update image
@@ -94,79 +94,87 @@ void SamplerRecorderRendererTask::Run() {
 
 		if(sampleIndex>=sampleCount) return;
 		itr_count++;
-        // Generate camera rays and compute radiance along rays
+		L.Clear();
        
         // Find camera ray for _sample[sampleIndex]_
         PBRT_STARTED_GENERATING_CAMERA_RAY(&samples[sampleIndex]);
-        float rayWeight = cameras.at(0)->GenerateRayDifferential(samples[sampleIndex], &ray);
+        float rayWeight = camera->GenerateRayDifferential(samples[sampleIndex], &ray);
         ray.ScaleDifferentials(1.f / sqrtf(sampler->samplesPerPixel));
         PBRT_FINISHED_GENERATING_CAMERA_RAY(&samples[sampleIndex], &rays[sampleIndex], rayWeight);
 
         // Evaluate radiance along camera ray
-        for(int j=0; j<L.size();j++) PBRT_STARTED_CAMERA_RAY_INTEGRATION(&rays[sampleIndex], &samples[sampleIndex]);
-        if (visualizeObjectIds) {
-            if (rayWeight > 0.f && scene->Intersect(ray, &isect)) {
-                // random shading based on shape id...
+        PBRT_STARTED_CAMERA_RAY_INTEGRATION(&rays[sampleIndex], &samples[sampleIndex]);
+
+		bool intersected = scene->Intersect(ray, &isect);
+
+        if (L.ContainsSpectrum(PRIMITIVES)) {
+			if (rayWeight > 0.f && intersected) {
+				// random shading based on shape id...
                 uint32_t ids[2] = { isect.shapeId, isect.primitiveId };
                 uint32_t h = hash((char *)ids, sizeof(ids));
-                float rgb[3] = { float(h & 0xff), float((h >> 8) & 0xff),
-                                    float((h >> 16) & 0xff) };
-                for(int j=0; j<L.size();j++)L.at(j) = Spectrum::FromRGB(rgb);
-                for(int j=0; j<L.size();j++)L.at(j) /= 255.f;
+                float rgb[3] = { float(h & 0xff), float((h >> 8) & 0xff), float((h >> 16) & 0xff) };
+                L[PRIMITIVES] = Spectrum::FromRGB(rgb);
+                L[PRIMITIVES] = L[PRIMITIVES]/255.f;
             }
-            else
-                for(int j=0; j<L.size();j++)L.at(j) = 0.f;
+            else L[PRIMITIVES] = Spectrum(0.);
         }
-        else {
-			if (rayWeight > 0.f){
-				L = renderer->Li_separated(scene, ray, &samples[sampleIndex], rng, arena, &isect, &T);
-				for(int j=0; j<L.size();j++) L.at(j)*=rayWeight;
-			} else {
-				for(int j=0; j<L.size();j++)L.at(j) = 0.f;
-				T = 1.f;
-			}
+        
+		if (rayWeight > 0.f){
+			renderer->Li_separate(scene, ray, &samples[sampleIndex], rng, arena, L, &isect, intersected, &T);
 
-			for(int j=0; j<L.size();j++)
-			{
-				// Issue warning if unexpected radiance value returned
-				if (L.at(j).HasNaNs()) {
-					Error("Not-a-number radiance value returned "
-							"for image sample.  Setting to black.");
-					L.at(j) = Spectrum(0.f);
-				}
-				else if (L.at(j).y() < -1e-5) {
-					Error("Negative luminance value, %f, returned "
-							"for image sample.  Setting to black.", L.at(j).y());
-					L.at(j) = Spectrum(0.f);
-				}
-				else if (isinf(L.at(j).y())) {
-					Error("Infinite luminance value returned "
-							"for image sample.  Setting to black.");
-					L.at(j) = Spectrum(0.f);
-				}
-			}
-        }
-        for(int j=0; j<L.size();j++) PBRT_FINISHED_CAMERA_RAY_INTEGRATION(&ray, &samples[sampleIndex], &L.at(j));
+			// only scale radiance value by ray weight
+			L[DIRECT]*=rayWeight;
+			L[INDIRECT]*=rayWeight;
+			L[BEAUTY]*=rayWeight;
+		} else {
+			L = Spectrum(0.);
+			T = 1.f;
+		}
 
-		for(int j=0; j<L.size();j++)
+		// Issue warning if unexpected radiance value returned
+		Spectrum spec = L.GetFirstSpectrum();
+		while(L.HasNextSpectrum())
 		{
+			if (spec.HasNaNs()) {
+				Error("Not-a-number value returned for image sample. Setting to black.");
+				spec = Spectrum(0.f);
+			}
+			else if (spec.y() < -1e-5) {
+				Error("Negative value, %f, returned for image sample. Setting to black.", spec.y());
+				spec = Spectrum(0.f);
+			}
+			else if (isinf(spec.y())) {
+				Error("Infinite value returned for image sample. Setting to black.");
+				spec = Spectrum(0.f);
+			}
+
+			spec = L.GetNextSpectrum();
+		}
+
+        PBRT_FINISHED_CAMERA_RAY_INTEGRATION(&ray, &samples[sampleIndex], &L.GetFirstSpectrum());
+
+		for(size_t i=0; i<camera->GetNumRenderPasses();i++)
+		{
+			Film* activePass = camera->GetRenderPass(i);
+			RenderPassType activePassType = activePass->GetRenderPassType();
+
 			// Report sample results to _Sampler_, add contributions to image
-			if (sampler->ReportResults(&samples[sampleIndex], &ray, &L.at(j), &isect, 1))
+			if (sampler->ReportResults(&samples[sampleIndex], &ray, &L[activePassType], &isect, 1))
 			{ 
-				PBRT_STARTED_ADDING_IMAGE_SAMPLE(&samples[sampleIndex], &ray, &L.at(j),&T);
+				PBRT_STARTED_ADDING_IMAGE_SAMPLE(&samples[sampleIndex], &ray, &L[activePassType],&T);
 
 				// use SetSample instead of AddSample to get only the current sample contribution
-				cameras.at(j)->film->SetSample(samples[sampleIndex], L.at(j));
+				activePass->SetSample(samples[sampleIndex], L[activePassType]);
 				PBRT_FINISHED_ADDING_IMAGE_SAMPLE();
 			}
+
+			activePass->UpdateDisplay(sampler->xPixelStart, sampler->yPixelStart, sampler->xPixelEnd+1, sampler->yPixelEnd+1);
 		}
         // Free _MemoryArena_ memory from computing image sample values
         arena.FreeAll();
     }
 
     // Clean up after _SamplerRendererTask_ is done with its image region
-    for(int j=0; j<L.size();j++) cameras.at(j)->film->UpdateDisplay(sampler->xPixelStart,
-        sampler->yPixelStart, sampler->xPixelEnd+1, sampler->yPixelEnd+1);
     delete sampler;
     delete[] samples;
     reporter.Update();
@@ -174,136 +182,20 @@ void SamplerRecorderRendererTask::Run() {
     PBRT_FINISHED_RENDERTASK(taskNum);
 }
 
-void SamplerAccumulationRendererTask::Run() {
-    PBRT_STARTED_RENDERTASK(taskNum);
-    // Get sub-_Sampler_ for _SamplerLightSeparationRendererTask_
-    Sampler *sampler = mainSampler->GetSubSampler(taskNum, taskCount);
-    if (!sampler)
-    {
-        reporter.Update();
-        PBRT_FINISHED_RENDERTASK(taskNum);
-        return;
-    }
-
-    // Declare local variables used for rendering loop
-    MemoryArena arena;
-    RNG rng(taskNum);
-
-    // Allocate space for samples and intersections
-    int maxSamples = sampler->MaximumSampleCount();
-    Sample *samples = origSample->Duplicate(maxSamples);
-    RayDifferential *rays = new RayDifferential[maxSamples];
-    vector<Spectrum *>Ls(3,0);
-	for(int i=0; i<Ls.size();i++)Ls.at(i) = new Spectrum[maxSamples];
-
-	Spectrum * Ts = new Spectrum[maxSamples];
-    Intersection *isects = new Intersection[maxSamples];
-
-    // Get samples from _Sampler_ and update image
-    int sampleCount;
-    while ((sampleCount = sampler->GetMoreSamples(samples, rng)) > 0) {
-        // Generate camera rays and compute radiance along rays
-        for (int i = 0; i < sampleCount; ++i) {
-            // Find camera ray for _sample[i]_
-            PBRT_STARTED_GENERATING_CAMERA_RAY(&samples[i]);
-            float rayWeight = cameras.at(0)->GenerateRayDifferential(samples[i], &rays[i]);
-            rays[i].ScaleDifferentials(1.f / sqrtf(sampler->samplesPerPixel));
-            PBRT_FINISHED_GENERATING_CAMERA_RAY(&samples[i], &rays[i], rayWeight);
-
-            // Evaluate radiance along camera ray
-            for(int j=0; j<Ls.size();j++) PBRT_STARTED_CAMERA_RAY_INTEGRATION(&rays[i], &samples[i]);
-            if (visualizeObjectIds) {
-                if (rayWeight > 0.f && scene->Intersect(rays[i], &isects[i])) {
-                    // random shading based on shape id...
-                    uint32_t ids[2] = { isects[i].shapeId, isects[i].primitiveId };
-                    uint32_t h = hash((char *)ids, sizeof(ids));
-                    float rgb[3] = { float(h & 0xff), float((h >> 8) & 0xff),
-                                     float((h >> 16) & 0xff) };
-                    for(int j=0; j<Ls.size();j++)Ls.at(j)[i] = Spectrum::FromRGB(rgb);
-                    for(int j=0; j<Ls.size();j++)Ls.at(j)[i] /= 255.f;
-                }
-                else
-                    for(int j=0; j<Ls.size();j++)Ls.at(j)[i] = 0.f;
-            }
-            else {
-				if (rayWeight > 0.f){
-					vector<Spectrum> tmp = renderer->Li_separated(scene, rays[i], &samples[i], rng, arena, &isects[i], &Ts[i]);
-					for(int j=0; j<Ls.size();j++)Ls.at(j)[i] = rayWeight * tmp.at(j);
-				}else {
-					for(int j=0; j<Ls.size();j++)Ls.at(j)[i] = 0.f;
-					Ts[i] = 1.f;
-				}
-
-				// Issue warning if unexpected radiance value returned
-				for(int j=0; j<Ls.size();j++)
-				{
-					if (Ls.at(j)[i].HasNaNs()) {
-						Error("Not-a-number radiance value returned "
-							  "for image sample.  Setting to black.");
-						Ls.at(j)[i] = Spectrum(0.f);
-					}
-					else if (Ls.at(j)[i].y() < -1e-5) {
-						Error("Negative luminance value, %f, returned "
-							  "for image sample.  Setting to black.", Ls.at(j)[i].y());
-						Ls.at(j)[i] = Spectrum(0.f);
-					}
-					else if (isinf(Ls.at(j)[i].y())) {
-						Error("Infinite luminance value returned "
-							  "for image sample.  Setting to black.");
-						Ls.at(j)[i] = Spectrum(0.f);
-					}
-				}
-            }
-            for(int j=0; j<Ls.size();j++) PBRT_FINISHED_CAMERA_RAY_INTEGRATION(&rays[i], &samples[i], &Ls.at(j)[i]);
-        }
-
-		for(int j=0; j<Ls.size();j++)
-		{
-			// Report sample results to _Sampler_, add contributions to image
-			if (sampler->ReportResults(samples, rays, Ls.at(j), isects, sampleCount))
-			{
-				for (int i = 0; i < sampleCount; ++i)
-				{
-					if(j==0)PBRT_STARTED_ADDING_IMAGE_SAMPLE(&samples[i], &rays[i], &Ls.at(j)[i], &Ts[i]);
-					cameras.at(j)->film->AddSample(samples[i], Ls.at(j)[i]);
-					if(j==0)PBRT_FINISHED_ADDING_IMAGE_SAMPLE();
-				}
-			}
-		}
-
-        // Free _MemoryArena_ memory from computing image sample values
-        arena.FreeAll();
-    }
-
-    // Clean up after _SamplerLightSeparationRendererTask_ is done with its image region
-    for(int j=0; j<Ls.size();j++) cameras.at(j)->film->UpdateDisplay(sampler->xPixelStart,
-        sampler->yPixelStart, sampler->xPixelEnd+1, sampler->yPixelEnd+1);
-
-    delete sampler;
-    delete[] samples;
-    delete[] rays;
-    for(int j=0; j<Ls.size();j++) delete[] Ls.at(j);
-    delete[] Ts;
-    delete[] isects;
-    reporter.Update();
-    PBRT_FINISHED_RENDERTASK(taskNum);
-}
 
 // SamplerRecorderRenderer Method Definitions
-SamplerRecorderRenderer::SamplerRecorderRenderer(Sampler *s, vector<Camera *>c,
-                                 PathIntegrator *pi, SingleScatteringIntegrator *ssi,
-                                 bool visIds) {
+SamplerRecorderRenderer::SamplerRecorderRenderer(Sampler *s, Camera *c,PathIntegrator *pi, 
+												 SingleScatteringIntegrator *ssi) {
     sampler = s;
-    cameras = c;
+    camera = c;
 	pathIntegrator = pi;
     singleScatteringIntegrator = ssi;
-    visualizeObjectIds = visIds;
 }
 
 
 SamplerRecorderRenderer::~SamplerRecorderRenderer() {
     delete sampler;
-    for(int j=0; j<cameras.size();j++) delete cameras.at(j);
+    delete camera;
     delete pathIntegrator;
     delete singleScatteringIntegrator;
 }
@@ -316,8 +208,8 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 
 	// Allow integrators to do preprocessing for the scene
 	PBRT_STARTED_PREPROCESSING();
-	for(int j=0; j<cameras.size();j++)pathIntegrator->Preprocess(scene, cameras.at(j), this);
-	for(int j=0; j<cameras.size();j++)singleScatteringIntegrator->Preprocess(scene, cameras.at(j), this);
+	pathIntegrator->Preprocess(scene, camera, this);
+	singleScatteringIntegrator->Preprocess(scene, camera, this);
 	PBRT_FINISHED_PREPROCESSING();
 
 	PBRT_STARTED_RENDERING();
@@ -326,10 +218,10 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 								singleScatteringIntegrator, scene);
 
 	// Compute number of _SamplerRendererTask_s to create for rendering
-	int nPixels = cameras.at(0)->film->xResolution * cameras.at(0)->film->yResolution;
+	int nPixels = camera->film->xResolution * camera->film->yResolution;
 	int nTasks = max(32 * NumSystemCores(), nPixels / (16*16));
 	nTasks = RoundUpPow2(nTasks);
-
+	
 	// write out an image after each sample
 	for(int s = 0; s<sampleCount;s++)
 	{
@@ -340,62 +232,32 @@ void SamplerRecorderRenderer::Render(const Scene *scene) {
 		vector<Task *> renderTasks;
 
 		for (int i = 0; i < nTasks; ++i)
-			renderTasks.push_back(new SamplerRecorderRendererTask(scene, this, cameras,
+			renderTasks.push_back(new SamplerRecorderRendererTask(scene, this, camera,
 														  reporter, sampler, sample, 
-														  visualizeObjectIds, 
 														  nTasks-1-i, nTasks,s));
 		EnqueueTasks(renderTasks);
 		WaitForAllTasks();
 		for (uint32_t i = 0; i < renderTasks.size(); ++i)
 			delete renderTasks[i];
 
-		// write out samples for direct light
-		ss.str("");
-		ss<<"direct_" <<std::setfill('0') << std::setw(3)<<s+1;
-		cameras.at(0)->film->WriteImageWithSuffix(ss.str());
-
-		// write out samples for indirect light
-		ss.str("");
-		ss<<"indirect_"<<std::setfill('0') << std::setw(3)  <<s+1;
-		cameras.at(1)->film->WriteImageWithSuffix(ss.str());
-
-		// write out samples for direct light
-		ss.str("");
-		ss <<"combined_"<<std::setfill('0') << std::setw(3) <<s+1;
-		cameras.at(2)->film->WriteImageWithSuffix(ss.str());
-
 		reporter.Done();
+
+		// write out all render passes
+		for(size_t i=0; i<camera->GetNumRenderPasses();i++){
+			camera->GetRenderPass(i)->WriteImageIndexed(s+1);
+		}
 	}
-
-	/*
-	// write accumulated image
-	ProgressReporter reporter(nTasks, "Rendering accumulated Samples");
-    vector<Task *> renderTasks;
-    for (int i = 0; i < nTasks; ++i)
-        renderTasks.push_back(new SamplerAccumulationRendererTask(scene, this, cameras,
-                                                      reporter, sampler, sample, 
-                                                      visualizeObjectIds, 
-                                                      nTasks-1-i, nTasks));
-    EnqueueTasks(renderTasks);
-    WaitForAllTasks();
-    for (uint32_t i = 0; i < renderTasks.size(); ++i)
-        delete renderTasks[i];
-    reporter.Done();
-
-	// write out accumulated image
-	cameras.at(0)->film->WriteImageWithSuffix("accum_direct");
-	cameras.at(1)->film->WriteImageWithSuffix("accum_indirect");
-	cameras.at(2)->film->WriteImageWithSuffix("accum_combined");
-	*/
-	// Clean up after rendering and store final image
+	
 	PBRT_FINISHED_RENDERING();
+
+	// Clean up after rendering and store final image
 	delete sample;
 
 }
 
-vector<Spectrum> SamplerRecorderRenderer::Li_separated(const Scene *scene,
+void SamplerRecorderRenderer::Li_separate(const Scene *scene,
         const RayDifferential &ray, const Sample *sample, RNG &rng,
-        MemoryArena &arena, Intersection *isect, Spectrum *T) const {
+		MemoryArena &arena, SpectrumContainer& L_io, Intersection *isect, bool intersected, Spectrum *T) const {
     Assert(ray.time == sample->time);
     Assert(!ray.HasNaNs());
 
@@ -404,21 +266,27 @@ vector<Spectrum> SamplerRecorderRenderer::Li_separated(const Scene *scene,
     if (!T) T = &localT;
     Intersection localIsect;
     if (!isect) isect = &localIsect;
-    vector<Spectrum> Li (3,0.);
-    if (scene->Intersect(ray, isect))
-		Li = pathIntegrator->Li_separate(scene, this, ray, *isect, sample, rng, arena);
+    
+    if (intersected)//scene->Intersect(ray, isect))
+		// result is stored in L_io
+		pathIntegrator->Li_separate(scene, this, ray, *isect, sample, rng, arena, L_io);
     else {
         // Handle ray that doesn't intersect any geometry
-        for (uint32_t i = 0; i < scene->lights.size(); ++i)
-			for (uint32_t j = 0; j < Li.size(); ++j)
-				Li.at(j) += scene->lights[i]->Le(ray);
+        for (uint32_t i = 0; i < scene->lights.size(); ++i){
+			Spectrum Le = scene->lights[i]->Le(ray);
+			L_io[BEAUTY] += Le;
+			L_io[DIRECT] += Le;
+			L_io[INDIRECT] += Le;
+		}
     }
-	vector<Spectrum> Lvi (3,0.);
-	Lvi = singleScatteringIntegrator->Li_separate(scene, this, ray, sample, rng,T, arena);
+	
+	SpectrumContainer Lv_io(camera->GetRenderPassTypes());
+	singleScatteringIntegrator->Li_separate(scene, this, ray, sample, rng,T, arena, Lv_io);
 
-	vector<Spectrum> Li_final(3,0.);
-	for(int i=0; i<3;i++) Li_final.at(i) = Li.at(i)+Lvi.at(i);
-    return Li_final;
+	L_io[BEAUTY] += Lv_io[BEAUTY];
+	L_io[DIRECT] += Lv_io[DIRECT];
+	L_io[INDIRECT] += Lv_io[INDIRECT];
+	
 }
 
 

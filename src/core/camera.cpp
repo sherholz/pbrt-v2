@@ -39,14 +39,22 @@
 
 // Camera Method Definitions
 Camera::~Camera() {
-    delete film;
+	for(int i=0; i<renderPasses.size();i++)
+		delete renderPasses.at(i);
+	renderPasses.clear();
+	film = 0;
 }
 
 
 Camera::Camera(const AnimatedTransform &cam2world,
-               float sopen, float sclose, Film *f)
+               float sopen, float sclose, vector<Film *>passes)
     : CameraToWorld(cam2world), shutterOpen(sopen), shutterClose(sclose) {
-    film = f;
+	renderPasses = passes;
+	if(renderPasses.size()==0)
+		Error("No render passes are specified. Rendering will fail!");
+
+	film = renderPasses.at(0);
+
     if (CameraToWorld.HasScale())
         Warning("Scaling detected in world-to-camera transformation!\n"
                 "The system has numerous assumptions, implicit and explicit,\n"
@@ -55,6 +63,23 @@ Camera::Camera(const AnimatedTransform &cam2world,
                 "the system may crash as a result of this.");
 }
 
+
+
+vector<RenderPassType> Camera::GetRenderPassTypes(){
+	vector<RenderPassType> passes;
+	for(int i=0; i<renderPasses.size();i++)
+		passes.push_back(renderPasses.at(i)->GetRenderPassType());
+
+	return passes;
+}
+
+unsigned int Camera::GetNumRenderPasses(){
+	return renderPasses.size();
+}
+
+Film* Camera::GetRenderPass(const unsigned int index){
+	return renderPasses.at(index);
+}
 
 float Camera::GenerateRayDifferential(const CameraSample &sample,
                                       RayDifferential *rd) const {
@@ -82,8 +107,8 @@ float Camera::GenerateRayDifferential(const CameraSample &sample,
 
 ProjectiveCamera::ProjectiveCamera(const AnimatedTransform &cam2world,
         const Transform &proj, const float screenWindow[4], float sopen,
-        float sclose, float lensr, float focald, Film *f)
-    : Camera(cam2world, sopen, sclose, f) {
+        float sclose, float lensr, float focald, vector<Film *>passes)
+    : Camera(cam2world, sopen, sclose, passes) {
     // Initialize depth of field parameters
     lensRadius = lensr;
     focalDistance = focald;

@@ -42,8 +42,8 @@
 
 // ImageFilm Method Definitions
 ImageFilm::ImageFilm(int xres, int yres, Filter *filt, const float crop[4],
-                     const string &fn, bool openWindow)
-    : Film(xres, yres) {
+                     const string &fn, bool openWindow, RenderPassType pass)
+    : Film(xres, yres, pass) {
     filter = filt;
     memcpy(cropWindow, crop, 4 * sizeof(float));
     filename = fn;
@@ -243,8 +243,29 @@ void ImageFilm::GetPixelExtent(int *xstart, int *xend,
     *yend   = yPixelStart + yPixelCount;
 }
 
+string Helper_GetRenderPassSuffix(RenderPassType pass){
+	string suffix = "";
+	switch(pass){
+	case BEAUTY:	return "beauty";
+	case DIRECT:	return "direct";
+	case INDIRECT:	return "indirect";
+	case NORMAL:	return "normal";
+	case PRIMITIVES:return "primitives";
+	case DEPTH:		return "depth";
+	}
+	return "unknown";
+}
+
 
 void ImageFilm::WriteImage(float splatScale) {
+
+	string suffix = Helper_GetRenderPassSuffix(renderPassType);
+	string filename_temp = filename;
+	std::stringstream ss;
+	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
+	ss<<filename_no_ending<<"_"<<suffix<<".exr";
+	filename = ss.str();
+
     // Convert image to RGB and compute final pixel values
     int nPix = xPixelCount * yPixelCount;
     float *rgb = new float[3*nPix];
@@ -277,17 +298,18 @@ void ImageFilm::WriteImage(float splatScale) {
     ::WriteImage(filename, rgb, NULL, xPixelCount, yPixelCount,
                  xResolution, yResolution, xPixelStart, yPixelStart);
 
+	filename = filename_temp;
+
     // Release temporary image memory
     delete[] rgb;
 }
 
-
-void ImageFilm::WriteImageWithSuffix(const string& suffix, float splatScale) {
-    
+void ImageFilm::WriteImageIndexed(const unsigned int index, float splatScale) {
+	string suffix = Helper_GetRenderPassSuffix(renderPassType);
 	string filename_temp = filename;
 	std::stringstream ss;
 	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
-	ss<<filename_no_ending<<"_"<<suffix<<".exr";
+	ss<<filename_no_ending<<"_"<<suffix<<"_"<<std::setfill('0') << std::setw(3)<<index<<".exr";
 	filename = ss.str();
 
 	WriteImage(splatScale);
@@ -301,7 +323,7 @@ void ImageFilm::UpdateDisplay(int x0, int y0, int x1, int y1,
 }
 
 
-ImageFilm *CreateImageFilm(const ParamSet &params, Filter *filter) {
+ImageFilm *CreateImageFilm(const ParamSet &params, Filter *filter, RenderPassType pass) {
     // Intentionally use FindOneString() rather than FindOneFilename() here
     // so that the rendered image is left in the working directory, rather
     // than the directory the scene file lives in.
@@ -337,7 +359,7 @@ ImageFilm *CreateImageFilm(const ParamSet &params, Filter *filter) {
         crop[3] = Clamp(max(cr[2], cr[3]), 0., 1.);
     }
 
-    return new ImageFilm(xres, yres, filter, crop, filename, openwin);
+    return new ImageFilm(xres, yres, filter, crop, filename, openwin, pass);
 }
 
 

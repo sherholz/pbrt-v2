@@ -40,9 +40,9 @@
 // PerspectiveCamera Method Definitions
 PerspectiveCamera:: PerspectiveCamera(const AnimatedTransform &cam2world,
         const float screenWindow[4], float sopen, float sclose,
-        float lensr, float focald, float fov, Film *f)
+        float lensr, float focald, float fov, vector<Film *>renderPasses)
     : ProjectiveCamera(cam2world, Perspective(fov, 1e-2f, 1000.f),
-                       screenWindow, sopen, sclose, lensr, focald, f) {
+                       screenWindow, sopen, sclose, lensr, focald, renderPasses) {
     // Compute differential changes in origin for perspective camera rays
     dxCamera = RasterToCamera(Point(1,0,0)) - RasterToCamera(Point(0,0,0));
     dyCamera = RasterToCamera(Point(0,1,0)) - RasterToCamera(Point(0,0,0));
@@ -139,7 +139,7 @@ float PerspectiveCamera::GenerateRayDifferential(const CameraSample &sample,
 
 
 PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
-        const AnimatedTransform &cam2world, Film *film) {
+        const AnimatedTransform &cam2world, vector<Film *>renderPasses) {
     // Extract common camera parameters from _ParamSet_
     float shutteropen = params.FindOneFloat("shutteropen", 0.f);
     float shutterclose = params.FindOneFloat("shutterclose", 1.f);
@@ -151,7 +151,7 @@ PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
     float lensradius = params.FindOneFloat("lensradius", 0.f);
     float focaldistance = params.FindOneFloat("focaldistance", 1e30f);
     float frame = params.FindOneFloat("frameaspectratio",
-        float(film->xResolution)/float(film->yResolution));
+        float(renderPasses.at(0)->xResolution)/float(renderPasses.at(0)->yResolution));
     float screen[4];
     if (frame > 1.f) {
         screen[0] = -frame;
@@ -175,5 +175,5 @@ PerspectiveCamera *CreatePerspectiveCamera(const ParamSet &params,
         // hack for structure synth, which exports half of the full fov
         fov = 2.f * halffov;
     return new PerspectiveCamera(cam2world, screen, shutteropen,
-        shutterclose, lensradius, focaldistance, fov, film);
+        shutterclose, lensradius, focaldistance, fov, renderPasses);
 }

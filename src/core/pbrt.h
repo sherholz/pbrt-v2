@@ -189,6 +189,8 @@ class SurfaceIntegrator;
 class Integrator;
 class VolumeIntegrator;
 
+enum RenderPassType{BEAUTY, DIRECT, INDIRECT, NORMAL, DEPTH, PRIMITIVES, INVALID};
+
 // Global Constants
 #define PBRT_VERSION "2.0.0"
 #ifdef M_PI
