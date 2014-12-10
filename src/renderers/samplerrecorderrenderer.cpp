@@ -84,7 +84,8 @@ void SamplerRecorderRendererTask::Run() {
     Sample *samples = origSample->Duplicate(maxSamples);
     RayDifferential ray;
     Spectrum T;
-	SpectrumContainer L(camera->GetRenderPassTypes());
+	std::vector<RenderPassType> rpt = camera->GetRenderPassTypes();
+    SpectrumContainer L(rpt);
     Intersection isect;
 
     // Get samples from _Sampler_ and update image
@@ -279,8 +280,8 @@ void SamplerRecorderRenderer::Li_separate(const Scene *scene,
 			L_io[INDIRECT] += Le;
 		}
     }
-	
-	SpectrumContainer Lv_io(camera->GetRenderPassTypes());
+		std::vector<RenderPassType> rpt = camera->GetRenderPassTypes();
+	SpectrumContainer Lv_io(rpt);
 	singleScatteringIntegrator->Li_separate(scene, this, ray, sample, rng,T, arena, Lv_io);
 
 	L_io[BEAUTY] += Lv_io[BEAUTY];

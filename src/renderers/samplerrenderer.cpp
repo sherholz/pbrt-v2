@@ -175,7 +175,8 @@ void SamplerRendererTaskTmp::Run() {
     RayDifferential *rays = new RayDifferential[maxSamples];
 	
 	SpectrumContainer* Ls = new SpectrumContainer[maxSamples];
-	for(int i=0; i<maxSamples;i++) Ls[i].SetRenderPassTypes(camera->GetRenderPassTypes());
+	std::vector<RenderPassType> rpt = camera->GetRenderPassTypes();
+	for(int i=0; i<maxSamples;i++) Ls[i].SetRenderPassTypes(rpt);
 
 	Spectrum * Ts = new Spectrum[maxSamples];
     Intersection *isects = new Intersection[maxSamples];
@@ -363,8 +364,8 @@ void SamplerRenderer::Li_separate(const Scene *scene,
 			L_io[INDIRECT] += Le;
 		}
     }
-	
-	SpectrumContainer Lv_io(camera->GetRenderPassTypes());
+		std::vector<RenderPassType> rpt = camera->GetRenderPassTypes();
+	SpectrumContainer Lv_io(rpt);
 	singleScatteringIntegrator->Li_separate(scene, this, ray, sample, rng,T, arena, Lv_io);
 
 	L_io[BEAUTY] += Lv_io[BEAUTY];
