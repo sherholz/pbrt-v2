@@ -54,7 +54,7 @@ public:
     virtual float GenerateRayDifferential(const CameraSample &sample, RayDifferential *rd) const;
 
 	virtual unsigned int GetNumRenderPasses();
-	virtual vector<RenderPassType> GetRenderPassTypes();
+	virtual vector<RenderPassType>& GetRenderPassTypes();
 	virtual Film* GetRenderPass(const unsigned int index);
 	
     // Camera Public Data
@@ -67,6 +67,7 @@ public:
 private:
 	// collection of available render passes
 	vector<Film*> renderPasses;
+	vector<RenderPassType> renderPassTypes;
 	
 };
 

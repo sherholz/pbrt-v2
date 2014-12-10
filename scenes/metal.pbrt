@@ -8,7 +8,7 @@ PixelFilter "box"
 Film "image" "integer xresolution" [256] "integer yresolution" [256]
 	
 
-Renderer "sampler" "integer samplesperpixel" [64] 
+Renderer "samplerrecorder" "integer samplesperpixel" [64] 
 
 WorldBegin
 

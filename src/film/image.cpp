@@ -252,8 +252,8 @@ string Helper_GetRenderPassSuffix(RenderPassType pass){
 	case NORMAL:	return "normal";
 	case PRIMITIVES:return "primitives";
 	case DEPTH:		return "depth";
+	default:		return "unknown";
 	}
-	return "unknown";
 }
 
 
@@ -305,11 +305,10 @@ void ImageFilm::WriteImage(float splatScale) {
 }
 
 void ImageFilm::WriteImageIndexed(const unsigned int index, float splatScale) {
-	string suffix = Helper_GetRenderPassSuffix(renderPassType);
 	string filename_temp = filename;
 	std::stringstream ss;
 	string filename_no_ending = filename.substr(0,filename_temp.find(".exr"));
-	ss<<filename_no_ending<<"_"<<suffix<<"_"<<std::setfill('0') << std::setw(3)<<index<<".exr";
+	ss<<filename_no_ending<<"_"<<std::setfill('0') << std::setw(3)<<index<<".exr";
 	filename = ss.str();
 
 	WriteImage(splatScale);

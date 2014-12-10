@@ -53,6 +53,9 @@ Camera::Camera(const AnimatedTransform &cam2world,
 	if(renderPasses.size()==0)
 		Error("No render passes are specified. Rendering will fail!");
 
+	for(int i=0; i<renderPasses.size();i++)
+		renderPassTypes.push_back(renderPasses.at(i)->GetRenderPassType());
+
 	film = renderPasses.at(0);
 
     if (CameraToWorld.HasScale())
@@ -65,12 +68,8 @@ Camera::Camera(const AnimatedTransform &cam2world,
 
 
 
-vector<RenderPassType> Camera::GetRenderPassTypes(){
-	vector<RenderPassType> passes;
-	for(int i=0; i<renderPasses.size();i++)
-		passes.push_back(renderPasses.at(i)->GetRenderPassType());
-
-	return passes;
+vector<RenderPassType>& Camera::GetRenderPassTypes(){
+	return renderPassTypes;
 }
 
 unsigned int Camera::GetNumRenderPasses(){

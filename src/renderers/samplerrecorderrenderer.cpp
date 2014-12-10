@@ -84,8 +84,7 @@ void SamplerRecorderRendererTask::Run() {
     Sample *samples = origSample->Duplicate(maxSamples);
     RayDifferential ray;
     Spectrum T;
-	std::vector<RenderPassType> rpt = camera->GetRenderPassTypes();
-    SpectrumContainer L(rpt);
+    SpectrumContainer L(camera->GetRenderPassTypes());
     Intersection isect;
 
     // Get samples from _Sampler_ and update image
