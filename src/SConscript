@@ -99,7 +99,9 @@ if arch == 'win32':
 
 output['obj2pbrt'] = env.Program('obj2pbrt', [ 'tools/obj2pbrt.cpp' ])
 
-output['defaults'] = [ output['pbrt'], output['obj2pbrt'] ]
+output['pbrt2nori'] = env.Program('pbrt2nori', [ 'tools/pbrt2nori.cpp' ]+ output['pbrt_lib'],LIBS = env_libs + exr_libs + parallel_libs)
+
+output['defaults'] = [ output['pbrt'], output['obj2pbrt'], output['pbrt2nori'] ]
 
 
 if len(exr_libs) > 0:

@@ -131,6 +131,9 @@
  #endif
 using std::map;
 
+#include <sstream>
+#include <fstream>
+#include <iostream>
 // API Global Variables
 Options PbrtOptions;
 
@@ -165,6 +168,9 @@ private:
 struct RenderOptions {
     // RenderOptions Public Methods
     RenderOptions();
+
+    void WriteScene();
+
     Scene *MakeScene();
     Camera *MakeCamera() const;
     Renderer *MakeRenderer() const;
@@ -1161,6 +1167,7 @@ void pbrtWorldEnd() {
     }
 
     // Create scene and render
+    renderOptions->WriteScene();
     Renderer *renderer = renderOptions->MakeRenderer();
     Scene *scene = renderOptions->MakeScene();
     if (scene && renderer) renderer->Render(scene);
@@ -1182,6 +1189,69 @@ void pbrtWorldEnd() {
     ImageTexture<RGBSpectrum, Spectrum>::ClearCache();
 }
 
+void RenderOptions::WriteScene(){
+
+	for(int i=0;i<primitives.size();i++){
+		Reference<Primitive> p = primitives[i];
+		const GeometricPrimitive* gp = dynamic_cast<const GeometricPrimitive*>(p.GetPtr());
+		if(gp ==NULL){
+			Warning("No GeometricPrimitive");
+		}else{
+			//gp->shape
+
+			const TriangleMesh* tm = dynamic_cast<const TriangleMesh*>(gp->shape.GetPtr());
+			if(tm ==NULL){
+				Warning("No Tri Mesh");
+			}else{
+				std::cout << "TriangleMesh["<< i<< "]: nverts: " << tm->nverts<< "\tntris: " << tm->ntris<<std::endl;
+				std::stringstream objFile;
+				objFile << "trimesh"<<"_"<<i<<".obj";
+				std::ofstream outFile(objFile.str().c_str());
+
+				for(int v = 0; v<tm->nverts;v++){
+					outFile << "v " << tm->p[v].x<< " "<< tm->p[v].y << " "<<tm->p[v].z<<"\n";
+				}
+
+
+
+				if(tm->n){
+					for(int v = 0; v<tm->nverts;v++){
+						outFile << "vn " << tm->n[v].x<< " "<< tm->n[v].y << " "<<tm->n[v].z<<"\n";
+					}
+				}
+
+				if(tm->uvs){
+					for(int v = 0; v<tm->nverts;v++){
+						outFile << "vt " << tm->uvs[2*v+0]<< " "<< tm->uvs[2*v+1] <<"\n";
+					}
+				}
+
+				for(int t = 0; t<tm->ntris;t++){
+					if(!tm->n && !tm->uvs){
+						outFile << "f " << tm->vertexIndex[3*t+0]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+1]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+2]+1 << "\n";
+					}else if(tm->n && !tm->uvs){
+						outFile << "f " << tm->vertexIndex[3*t+0]+1 << "//"<<tm->vertexIndex[3*t+0]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+1]+1 << "//"<<tm->vertexIndex[3*t+1]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+2]+1 << "//"<<tm->vertexIndex[3*t+2]+1 << "\n";
+
+					}else if(!tm->n && tm->uvs){
+						outFile << "f " << tm->vertexIndex[3*t+0]+1 << "/"<<tm->vertexIndex[3*t+0]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+1]+1 << "/"<<tm->vertexIndex[3*t+1]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+2]+1 << "/"<<tm->vertexIndex[3*t+2]+1 << "\n";
+
+					}else{
+						outFile << "f " << tm->vertexIndex[3*t+0]+1 << "/"<<tm->vertexIndex[3*t+0]+1<< "/"<<tm->vertexIndex[3*t+0]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+1]+1 << "/"<<tm->vertexIndex[3*t+1]+1<< "/"<<tm->vertexIndex[3*t+1]+1;
+						outFile <<	" "	<< tm->vertexIndex[3*t+2]+1 << "/"<<tm->vertexIndex[3*t+2]+1<< "/"<<tm->vertexIndex[3*t+2]+1 << "\n";
+					}
+				}
+			}
+		}
+	}
+
+}
 
 Scene *RenderOptions::MakeScene() {
     // Initialize _volumeRegion_ from volume region(s)

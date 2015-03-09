@@ -56,7 +56,7 @@ public:
     void Refine(vector<Reference<Shape> > &refined) const;
     friend class Triangle;
     template <typename T> friend class VertexTexture;
-protected:
+public:
     // TriangleMesh Protected Data
     int ntris, nverts;
     int *vertexIndex;
