@@ -1191,6 +1191,57 @@ void pbrtWorldEnd() {
 
 void RenderOptions::WriteScene(){
 
+	std::stringstream noriFileName;
+	noriFileName << "nori-pbrt-scene.xml";
+	std::ofstream noriFile(noriFileName.str().c_str());
+
+	noriFile << "<scene>"<< std::endl;
+
+
+	noriFile << "\t<sampler type=\"independent\">"<< std::endl;
+	noriFile << "\t\t<integer name=\"sampleCount\" value=\"64\"/>"<< std::endl;
+	noriFile << "\t</sampler>"<< std::endl;
+
+	noriFile << "\t<rendermanager type=\"progressive\"/>"<< std::endl;
+
+	noriFile << "\t<accelerator type=\"embree2\"/>"<< std::endl;
+
+
+	noriFile << "\t<integrator type=\"mipath\">"<<std::endl;
+	noriFile << "\t\t<integer name=\"rrMinBounces\" value=\"10\"/>" << std::endl;
+	noriFile << "\t\t<integer name=\"maxBounces\" value=\"60\"/>"<< std::endl;
+	noriFile << "\t</integrator>"<< std::endl;
+
+	noriFile << "\t<camera type=\"perspective\">"<< std::endl;
+	//film
+	int resX = this->FilmParams.FindOneInt("xresolution",512);
+	int resY = this->FilmParams.FindOneInt("yresolution",512);
+	std::cout << "ResX: "<< resX << std::endl;
+	std::cout << "ResY: "<< resY << std::endl;
+	//camera
+	float cFov;
+	cFov = this->CameraParams.FindOneFloat("fov",45.0);
+	std::cout << "Fov: "<< cFov << std::endl;
+	noriFile << "\t\t<float name=\"fov\" value=\""<< cFov<<"\"/>" << std::endl;
+	noriFile << "\t\t<integer name=\"width\" value=\""<< resX<<"\"/>" << std::endl;
+	noriFile << "\t\t<integer name=\"height\" value=\""<< resY<<"\"/>" << std::endl;
+
+	Matrix4x4 m = this->CameraToWorld[0].GetMatrix();
+
+	noriFile << "\t\t<transform name=\"toWorld\">"<< std::endl;
+	noriFile << "\t\t\t<scale value=\"-1 , 1, 1\"/>"<< std::endl;
+	noriFile << "\t\t\t<matrix value=\""<< m.m[0][0] << ", "<< m.m[0][1] << ", "<< m.m[0][2] << ", "<< m.m[0][3];
+	noriFile << 				", "  << m.m[1][0] << ", "<< m.m[1][1] << ", "<< m.m[1][2] << ", "<< m.m[1][3];
+	noriFile << 				", "  << m.m[2][0] << ", "<< m.m[2][1] << ", "<< m.m[2][2] << ", "<< m.m[2][3];
+	noriFile << 				", "  << m.m[3][0] << ", "<< m.m[3][1] << ", "<< m.m[3][2] << ", "<< m.m[3][3];
+	noriFile << "\"/>"<<std::endl;
+	noriFile << "\t\t</transform>"<< std::endl;
+
+	noriFile << "\t</camera>"<< std::endl;
+
+
+
+
 	for(int i=0;i<primitives.size();i++){
 		Reference<Primitive> p = primitives[i];
 		const GeometricPrimitive* gp = dynamic_cast<const GeometricPrimitive*>(p.GetPtr());
@@ -1247,9 +1298,39 @@ void RenderOptions::WriteScene(){
 						outFile <<	" "	<< tm->vertexIndex[3*t+2]+1 << "/"<<tm->vertexIndex[3*t+2]+1<< "/"<<tm->vertexIndex[3*t+2]+1 << "\n";
 					}
 				}
+
+				//gp->material->
+
+				//noriFile << "</camera>"<< std::endl;
+				noriFile << "\t<mesh type=\"obj\">"<<std::endl;
+				noriFile << "\t\t<string name=\"filename\" value=\""<<objFile.str()<< "\"/>" << std::endl;
+
+				noriFile << "\t\t<bsdf type=\"diffuse\">"<<std::endl;
+				noriFile << "\t\t\t<color name=\"albedo\" value=\".69804,.69804,.69804\"/>" << std::endl;
+				noriFile << "\t\t</bsdf>" << std::endl;
+				noriFile << "\t\t<transform name=\"toWorld\">"<<std::endl;
+				noriFile << "\t\t\t<translate value=\"0,0,0\"/>"<<std::endl;
+				noriFile << "\t\t</transform>"<<std::endl;
+				noriFile << "\t</mesh>"<<std::endl;
 			}
+
+
+
 		}
+
+		for (int i=0;i<this->lights.size();i++){
+			Light *l  = lights[i];
+			if(dynamic_cast<InfiniteAreaLight*>(l)){
+				InfiniteAreaLight *ial = dynamic_cast<InfiniteAreaLight*>(l);
+			}
+
+
+		}
+
+
+
 	}
+	noriFile << "</scene>"<<std::endl;
 
 }
 
