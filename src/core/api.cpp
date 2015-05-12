@@ -1304,9 +1304,10 @@ void RenderOptions::WriteScene(){
 				//noriFile << "</camera>"<< std::endl;
 				noriFile << "\t<mesh type=\"obj\">"<<std::endl;
 				noriFile << "\t\t<string name=\"filename\" value=\""<<objFile.str()<< "\"/>" << std::endl;
-
-				noriFile << "\t\t<bsdf type=\"diffuse\">"<<std::endl;
-				noriFile << "\t\t\t<color name=\"albedo\" value=\".69804,.69804,.69804\"/>" << std::endl;
+				noriFile << "\t\t<bsdf type=\"twosided\">"<<std::endl;
+				noriFile << "\t\t\t<bsdf type=\"diffuse\">"<<std::endl;
+				noriFile << "\t\t\t\t<color name=\"albedo\" value=\".69804,.69804,.69804\"/>" << std::endl;
+				noriFile << "\t\t\t</bsdf>" << std::endl;
 				noriFile << "\t\t</bsdf>" << std::endl;
 				noriFile << "\t\t<transform name=\"toWorld\">"<<std::endl;
 				noriFile << "\t\t\t<translate value=\"0,0,0\"/>"<<std::endl;
